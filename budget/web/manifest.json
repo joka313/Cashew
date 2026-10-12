@@ -2,6 +2,7 @@
     "name": "Cashew",
     "short_name": "Cashew",
     "start_url": ".",
+    "scope": ".",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#5f85c2",
