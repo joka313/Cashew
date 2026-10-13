@@ -4,6 +4,7 @@ import 'package:budget/colors.dart';
 import 'package:budget/database/tables.dart';
 import 'package:budget/functions.dart';
 import 'package:budget/pages/addTransactionPage.dart';
+import 'package:budget/vietqr/vietqr_image_reader.dart';
 import 'package:budget/vietqr/vietqr_parser.dart';
 import 'package:budget/vietqr/vietqr_transfer_sheet.dart';
 import 'package:budget/widgets/button.dart';
@@ -14,6 +15,7 @@ import 'package:budget/widgets/openPopup.dart';
 import 'package:budget/widgets/textInput.dart';
 import 'package:budget/widgets/textWidgets.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 // Scan a VietQR, add it as an expense, then offer to transfer via the bank app
@@ -68,6 +70,7 @@ class _VietQrScanPageState extends State<VietQrScanPage> {
   final TextEditingController pasteController = TextEditingController();
   bool handled = false;
   bool cameraFailed = false;
+  bool readingQr = false;
   String? errorMessage;
 
   @override
@@ -105,6 +108,34 @@ class _VietQrScanPageState extends State<VietQrScanPage> {
     scannerController.stop();
     popRoute(context, data);
     return true;
+  }
+
+  // The reader is called synchronously so clipboard access keeps the tap gesture
+  Future readQrFrom(Future<String?> Function() reader) async {
+    if (readingQr || handled) return;
+    setState(() {
+      readingQr = true;
+      errorMessage = null;
+    });
+    try {
+      String? raw = await reader();
+      if (raw != null && mounted) handleQrString(raw);
+    } on VietQrImageException catch (e) {
+      if (mounted) setState(() => errorMessage = e.message);
+    } catch (e) {
+      if (mounted) {
+        setState(() => errorMessage = "Không đọc được mã QR: " + e.toString());
+      }
+    } finally {
+      if (mounted) setState(() => readingQr = false);
+    }
+  }
+
+  // Returns null when the user cancels the picker
+  Future<String?> pickImageAndReadQr() async {
+    XFile? file = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (file == null) return null;
+    return await readQrFromImagePath(file.path);
   }
 
   String cameraErrorMessage(MobileScannerException error) {
@@ -164,13 +195,46 @@ class _VietQrScanPageState extends State<VietQrScanPage> {
         Padding(
           padding: const EdgeInsetsDirectional.symmetric(horizontal: 18),
           child: TextFont(
-            text: errorMessage ?? "Đưa mã VietQR chuyển khoản vào khung hình.",
+            text: readingQr
+                ? "Đang đọc mã QR..."
+                : errorMessage ?? "Đưa mã VietQR chuyển khoản vào khung hình.",
             fontSize: 15,
             maxLines: 5,
             textAlign: TextAlign.center,
             textColor: errorMessage != null
                 ? Theme.of(context).colorScheme.error
                 : getColor(context, "textLight"),
+          ),
+        ),
+        SizedBox(height: 15),
+        Padding(
+          padding: const EdgeInsetsDirectional.symmetric(horizontal: 18),
+          child: Row(
+            children: [
+              Expanded(
+                child: Button(
+                  label: "Chọn ảnh",
+                  icon: Icons.photo_library_rounded,
+                  expandedLayout: true,
+                  disabled: readingQr,
+                  onTap: () {
+                    readQrFrom(pickImageAndReadQr);
+                  },
+                ),
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Button(
+                  label: "Dán",
+                  icon: Icons.content_paste_rounded,
+                  expandedLayout: true,
+                  disabled: readingQr,
+                  onTap: () {
+                    readQrFrom(readQrFromClipboard);
+                  },
+                ),
+              ),
+            ],
           ),
         ),
         if (cameraFailed) ...[
