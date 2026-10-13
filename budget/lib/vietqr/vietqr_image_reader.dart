@@ -5,8 +5,10 @@ export 'vietqr_image_reader_stub.dart'
     if (dart.library.js_interop) 'vietqr_image_reader_web.dart';
 
 class VietQrImageException implements Exception {
-  VietQrImageException(this.message);
+  VietQrImageException(this.message, {this.clipboardEmpty = false});
   final String message;
+  // The clipboard API returned nothing readable (iOS hides copied photos)
+  final bool clipboardEmpty;
 
   @override
   String toString() => message;

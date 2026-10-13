@@ -173,6 +173,15 @@ Future<String?> _tryDecodeBlob(JSObject blob) async {
   }
 }
 
+// For an image File taken from a paste event
+Future<String> readQrFromImageBlob(JSObject blob) async {
+  String? text = await _tryDecodeBlob(blob);
+  if (text == null) {
+    throw VietQrImageException('Không tìm thấy mã QR trong ảnh vừa dán.');
+  }
+  return text;
+}
+
 // Image URLs in copied HTML (<img src>) or a text/uri-list
 List<String> _imageUrlsInText(String text) {
   return RegExp(
@@ -255,7 +264,8 @@ Future<String> readQrFromClipboard() async {
     }
     String found = seenTypes.isEmpty ? 'trống' : seenTypes.join(', ');
     throw VietQrImageException(
-        'Clipboard không có ảnh QR hay chuỗi QR (iOS trả về: $found).');
+        'Clipboard không có ảnh QR hay chuỗi QR (iOS trả về: $found).',
+        clipboardEmpty: true);
   }
 
   if (clipboard.has('readText')) {

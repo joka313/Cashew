@@ -6,6 +6,7 @@ import 'package:budget/functions.dart';
 import 'package:budget/pages/addTransactionPage.dart';
 import 'package:budget/vietqr/vietqr_image_reader.dart';
 import 'package:budget/vietqr/vietqr_parser.dart';
+import 'package:budget/vietqr/vietqr_paste_target.dart';
 import 'package:budget/vietqr/vietqr_transfer_sheet.dart';
 import 'package:budget/widgets/button.dart';
 import 'package:budget/widgets/framework/pageFramework.dart';
@@ -71,7 +72,11 @@ class _VietQrScanPageState extends State<VietQrScanPage> {
   bool handled = false;
   bool cameraFailed = false;
   bool readingQr = false;
+  bool showPasteTarget = false;
   String? errorMessage;
+  // Camera errors must not overwrite a message from Pick photo / Paste
+  // right away, the camera keeps reporting any non-VietQR code it sees
+  DateTime? manualMessageTime;
 
   @override
   void dispose() {
@@ -80,28 +85,36 @@ class _VietQrScanPageState extends State<VietQrScanPage> {
     super.dispose();
   }
 
+  void showError(String message, {required bool fromCamera}) {
+    if (fromCamera &&
+        manualMessageTime != null &&
+        DateTime.now().difference(manualMessageTime!) < Duration(seconds: 6)) {
+      return;
+    }
+    if (fromCamera == false) manualMessageTime = DateTime.now();
+    setState(() {
+      errorMessage = message;
+    });
+  }
+
   // Returns true when the QR was accepted and the page is closing
-  bool handleQrString(String raw) {
+  bool handleQrString(String raw, {bool fromCamera = false}) {
     if (handled) return false;
     VietQrData data;
     try {
       data = parseVietQr(raw);
     } on VietQrFormatException catch (e) {
-      setState(() {
-        errorMessage = e.message;
-      });
+      showError(e.message, fromCamera: fromCamera);
       return false;
     }
     if (data.crcValid == false) {
-      setState(() {
-        errorMessage = "Mã QR bị lỗi (sai mã kiểm tra CRC). Hãy quét lại.";
-      });
+      showError("Mã QR bị lỗi (sai mã kiểm tra CRC). Hãy quét lại.",
+          fromCamera: fromCamera);
       return false;
     }
     if (data.account.isEmpty) {
-      setState(() {
-        errorMessage = "Mã QR không có số tài khoản người nhận.";
-      });
+      showError("Mã QR không có số tài khoản người nhận.",
+          fromCamera: fromCamera);
       return false;
     }
     handled = true;
@@ -121,10 +134,16 @@ class _VietQrScanPageState extends State<VietQrScanPage> {
       String? raw = await reader();
       if (raw != null && mounted) handleQrString(raw);
     } on VietQrImageException catch (e) {
-      if (mounted) setState(() => errorMessage = e.message);
+      if (mounted && e.clipboardEmpty) {
+        // iOS hides copied photos from the clipboard API, a real paste works
+        setState(() => showPasteTarget = true);
+        showError('Chạm giữ vào ô bên dưới rồi chọn "Dán".', fromCamera: false);
+      } else if (mounted) {
+        showError(e.message, fromCamera: false);
+      }
     } catch (e) {
       if (mounted) {
-        setState(() => errorMessage = "Không đọc được mã QR: " + e.toString());
+        showError("Không đọc được mã QR: " + e.toString(), fromCamera: false);
       }
     } finally {
       if (mounted) setState(() => readingQr = false);
@@ -143,7 +162,8 @@ class _VietQrScanPageState extends State<VietQrScanPage> {
       return "Chưa được cấp quyền camera. Hãy cho phép camera cho trang này (Cài đặt > Safari > Camera) rồi thử lại.";
     }
     String details = error.errorDetails?.message ?? "";
-    return "Không mở được camera." + (details.isEmpty ? "" : " (" + details + ")");
+    return "Không mở được camera." +
+        (details.isEmpty ? "" : " (" + details + ")");
   }
 
   @override
@@ -165,7 +185,7 @@ class _VietQrScanPageState extends State<VietQrScanPage> {
                   for (Barcode barcode in capture.barcodes) {
                     String? raw = barcode.rawValue;
                     if (raw != null && raw.isNotEmpty) {
-                      if (handleQrString(raw)) return;
+                      if (handleQrString(raw, fromCamera: true)) return;
                     }
                   }
                 },
@@ -237,6 +257,20 @@ class _VietQrScanPageState extends State<VietQrScanPage> {
             ],
           ),
         ),
+        if (showPasteTarget) ...[
+          SizedBox(height: 15),
+          Padding(
+            padding: const EdgeInsetsDirectional.symmetric(horizontal: 18),
+            child: buildVietQrPasteTarget(
+              placeholder: 'Chạm giữ vào đây rồi chọn "Dán"',
+              textColor: getColor(context, "textLight"),
+              borderColor: Theme.of(context).colorScheme.primary,
+              onPaste: (Future<String> result) {
+                readQrFrom(() => result);
+              },
+            ),
+          ),
+        ],
         if (cameraFailed) ...[
           SizedBox(height: 20),
           TextInput(
