@@ -10,6 +10,7 @@ import 'package:budget/vietqr/vietqr_image_reader.dart';
 const String _zxingScriptUrl = 'https://unpkg.com/@zxing/library@0.19.1';
 const String _zxingScriptId = 'mobile-scanner-barcode-reader';
 const int _maxImageSide = 1600;
+const int _maxRetryImageSide = 4000;
 
 JSObject get _document => globalContext.getProperty<JSObject>('document'.toJS);
 
@@ -37,8 +38,9 @@ Future<void> _loadZXing() async {
                 'Không tải được thư viện đọc QR. Kiểm tra kết nối mạng.'));
           }
         }).toJS);
-    _document.getProperty<JSObject>('head'.toJS).callMethod(
-        'appendChild'.toJS, script);
+    _document
+        .getProperty<JSObject>('head'.toJS)
+        .callMethod('appendChild'.toJS, script);
     await completer.future;
   } else {
     // The script tag exists but may still be loading
@@ -72,54 +74,73 @@ Future<JSObject> _loadImage(String url) {
   return completer.future;
 }
 
-// Large photos are slow and less reliable to decode, scale them down first
-Future<String> _downscaledDataUrl(String url) async {
-  JSObject image = await _loadImage(url);
-  int width = image.getProperty<JSNumber>('naturalWidth'.toJS).toDartInt;
-  int height = image.getProperty<JSNumber>('naturalHeight'.toJS).toDartInt;
-  if (width == 0 || height == 0) return url;
-  double scale = min(1.0, _maxImageSide / max(width, height));
-  if (scale >= 1.0) return url;
-  JSObject canvas =
-      _document.callMethod<JSObject>('createElement'.toJS, 'canvas'.toJS);
-  canvas.setProperty('width'.toJS, (width * scale).round().toJS);
-  canvas.setProperty('height'.toJS, (height * scale).round().toJS);
-  JSObject ctx = canvas.callMethod<JSObject>('getContext'.toJS, '2d'.toJS);
-  ctx.callMethodVarArgs('drawImage'.toJS, [
-    image,
-    0.toJS,
-    0.toJS,
-    (width * scale).round().toJS,
-    (height * scale).round().toJS,
-  ]);
-  return canvas
-      .callMethod<JSString>('toDataURL'.toJS, 'image/png'.toJS)
-      .toDart;
+JSObject _newZXing(String name, [JSAny? arg]) {
+  JSFunction constructor = globalContext
+      .getProperty<JSObject>('ZXing'.toJS)
+      .getProperty<JSFunction>(name.toJS);
+  return arg == null
+      ? constructor.callAsConstructor<JSObject>()
+      : constructor.callAsConstructor<JSObject>(arg);
 }
 
-Future<String?> _decodeUrl(String url) async {
-  JSObject zxing = globalContext.getProperty<JSObject>('ZXing'.toJS);
-  JSObject reader = zxing
-      .getProperty<JSFunction>('BrowserQRCodeReader'.toJS)
-      .callAsConstructor<JSObject>();
+JSObject _drawOnCanvas(JSObject image, int width, int height, int maxSide) {
+  double scale = min(1.0, maxSide / max(width, height));
+  int canvasWidth = (width * scale).round();
+  int canvasHeight = (height * scale).round();
+  JSObject canvas =
+      _document.callMethod<JSObject>('createElement'.toJS, 'canvas'.toJS);
+  canvas.setProperty('width'.toJS, canvasWidth.toJS);
+  canvas.setProperty('height'.toJS, canvasHeight.toJS);
+  canvas.callMethod<JSObject>('getContext'.toJS, '2d'.toJS).callMethodVarArgs(
+      'drawImage'.toJS,
+      [image, 0.toJS, 0.toJS, canvasWidth.toJS, canvasHeight.toJS]);
+  return canvas;
+}
+
+// Uses the ZXing core decoder directly. BrowserQRCodeReader.decodeFromImageUrl
+// in 0.19.1 treats an <img> as a video (videoWidth is undefined, not 0),
+// draws an empty frame and never finds the QR.
+String? _decodeCanvas(JSObject canvas) {
+  JSObject hints =
+      globalContext.getProperty<JSFunction>('Map'.toJS).callAsConstructor();
+  hints.callMethod(
+      'set'.toJS,
+      globalContext
+          .getProperty<JSObject>('ZXing'.toJS)
+          .getProperty<JSObject>('DecodeHintType'.toJS)
+          .getProperty<JSAny>('TRY_HARDER'.toJS),
+      true.toJS);
   try {
-    JSObject result = await reader
-        .callMethod<JSPromise<JSObject>>('decodeFromImageUrl'.toJS, url.toJS)
-        .toDart;
+    JSObject bitmap = _newZXing(
+        'BinaryBitmap',
+        _newZXing('HybridBinarizer',
+            _newZXing('HTMLCanvasElementLuminanceSource', canvas)));
+    JSObject result = _newZXing('QRCodeReader')
+        .callMethod<JSObject>('decode'.toJS, bitmap, hints);
     return result.callMethod<JSString>('getText'.toJS).toDart;
   } catch (e) {
-    // ZXing rejects with NotFoundException when there is no QR in the image
+    // ZXing throws NotFoundException when there is no QR in the image
     return null;
-  } finally {
-    reader.callMethod('reset'.toJS);
   }
 }
 
 Future<String> _decodeImageUrl(String url) async {
   await _loadZXing();
-  String? text = await _decodeUrl(await _downscaledDataUrl(url));
-  // A small QR in a big photo can be lost when scaled down, retry full size
-  text ??= await _decodeUrl(url);
+  JSObject image = await _loadImage(url);
+  int width = image.getProperty<JSNumber>('naturalWidth'.toJS).toDartInt;
+  int height = image.getProperty<JSNumber>('naturalHeight'.toJS).toDartInt;
+  if (width == 0 || height == 0) {
+    throw VietQrImageException('Không mở được ảnh.');
+  }
+  // Large photos are slow to decode, try a scaled down copy first
+  String? text =
+      _decodeCanvas(_drawOnCanvas(image, width, height, _maxImageSide));
+  // A small QR in a big photo can be lost when scaled down, retry larger.
+  // iOS blanks canvases above ~16.7M pixels, so cap the retry size
+  if (text == null && max(width, height) > _maxImageSide) {
+    text =
+        _decodeCanvas(_drawOnCanvas(image, width, height, _maxRetryImageSide));
+  }
   if (text == null || text.isEmpty) {
     throw VietQrImageException(
         'Không tìm thấy mã QR trong ảnh. Thử cắt sát mã QR rồi chọn lại.');
@@ -163,9 +184,8 @@ Future<String> readQrFromClipboard() async {
             .callMethod<JSPromise<JSObject>>('getType'.toJS, imageType.toJS)
             .toDart;
         JSObject urlApi = globalContext.getProperty<JSObject>('URL'.toJS);
-        String url = urlApi
-            .callMethod<JSString>('createObjectURL'.toJS, blob)
-            .toDart;
+        String url =
+            urlApi.callMethod<JSString>('createObjectURL'.toJS, blob).toDart;
         try {
           return await _decodeImageUrl(url);
         } finally {
