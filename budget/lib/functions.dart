@@ -391,6 +391,19 @@ checkYesterdayTodayTomorrow(DateTime date) {
   return false;
 }
 
+// The "date format" setting. Null keeps the worded default (e.g. Mar 15)
+const Map<String, String> numericDateFormatsWithoutYear = {
+  "dd/MM/yyyy": "dd/MM",
+  "MM/dd/yyyy": "MM/dd",
+  "yyyy-MM-dd": "MM-dd",
+};
+
+String? getNumericDateFormat({required bool includeYear}) {
+  String format = appStateSettings["dateFormat"] ?? "default";
+  if (numericDateFormatsWithoutYear.containsKey(format) == false) return null;
+  return includeYear ? format : numericDateFormatsWithoutYear[format];
+}
+
 // e.g. Today/Yesterday/Tomorrow/Tuesday/ Mar 15
 String getWordedDateShort(
   DateTime date, {
@@ -406,6 +419,9 @@ String getWordedDateShort(
   }
 
   final locale = navigatorKey.currentContext?.locale.toString();
+
+  String? numericFormat = getNumericDateFormat(includeYear: includeYear);
+  if (numericFormat != null) return DateFormat(numericFormat).format(date);
 
   if (includeYear) {
     return DateFormat.yMMMd(locale).format(date);
@@ -432,6 +448,12 @@ String getWordedDateShortMore(
     } else {
       return checkYesterdayTodayTomorrow(date);
     }
+  }
+  String? numericFormat =
+      getNumericDateFormat(includeYear: includeYear || includeTime);
+  if (numericFormat != null) {
+    return DateFormat(numericFormat).format(date) +
+        (includeTime && !includeYear ? " - " + getWordedTime(locale, date) : "");
   }
   if (includeYear) {
     return DateFormat.MMMMd(locale).format(date) +

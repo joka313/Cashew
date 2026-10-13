@@ -215,6 +215,9 @@ Future<Map<String, dynamic>> getDefaultPreferences() async {
     "allSpendingSetFiltersString": null,
     "transactionsListPageSetFiltersString": null,
     "increaseTextContrast": false,
+    "textScale": 1.0, // multiplies the system text size
+    "dateFormat": "default", // "default" keeps worded dates (e.g. Mar 15)
+    "showAttachmentButton": true,
     "customNumberFormat": false,
     "numberFormatDelimiter": ",",
     "numberFormatDecimal": ".",

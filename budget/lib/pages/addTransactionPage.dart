@@ -4388,6 +4388,8 @@ class _TransactionNotesTextInputState extends State<TransactionNotesTextInput> {
               }
             },
           ),
+          // "Show attachment button" setting
+          if (appStateSettings["showAttachmentButton"] != false) ...[
           HorizontalBreak(
             padding: EdgeInsetsDirectional.zero,
             color: appStateSettings["materialYou"]
@@ -4520,6 +4522,7 @@ class _TransactionNotesTextInputState extends State<TransactionNotesTextInput> {
               );
             },
           ),
+          ],
           AnimatedSizeSwitcher(
             child: extractedLinks.length <= 0
                 ? Container(

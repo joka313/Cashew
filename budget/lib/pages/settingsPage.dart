@@ -240,7 +240,17 @@ class MorePages extends StatelessWidget {
                             isOutlined: true,
                           ),
                         )
-                      : SizedBox.shrink(),
+                      // The web has no notifications, show the activity log here
+                      : Expanded(
+                          child: SettingsContainerOpenPage(
+                            openPage: ActivityPage(),
+                            title: "transaction-activity-log".tr(),
+                            icon: appStateSettings["outlinedIcons"]
+                                ? Icons.ballot_outlined
+                                : Icons.ballot_rounded,
+                            isOutlined: true,
+                          ),
+                        ),
               if (hasSideNavigation == false)
                 Expanded(
                     child: GoogleAccountLoginButton(
@@ -695,11 +705,13 @@ class MoreOptionsPagePreferences extends StatelessWidget {
         HeaderHeightSetting(),
         OutlinedIconsSetting(),
         FontPickerSetting(),
+        TextScaleSetting(),
         AppAnimationSetting(),
         CountingNumberAnimationSetting(),
         IncreaseTextContrastSetting(),
         SettingsHeader(title: "transactions".tr()),
         TransactionsSettings(),
+        ShowAttachmentButtonSetting(),
         SettingsHeader(title: "accounts".tr()),
         WalletsSettings(),
         PrimaryCurrencySetting(),
@@ -715,6 +727,7 @@ class MoreOptionsPagePreferences extends StatelessWidget {
         NumberFormattingSetting(),
         PercentagePrecisionSetting(),
         Time24HourFormatSetting(),
+        DateFormatSetting(),
         FirstDayOfWeekSetting(updateHomePage: true),
         NumberPadFormatSetting(),
       ],
@@ -1191,6 +1204,76 @@ class NumberFormattingSetting extends StatelessWidget {
           updateGlobalState: true,
           forceGlobalStateUpdate: originalSetting != newSetting,
         );
+      },
+    );
+  }
+}
+
+class TextScaleSetting extends StatelessWidget {
+  const TextScaleSetting({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsContainerDropdown(
+      title: "Cỡ chữ",
+      icon: appStateSettings["outlinedIcons"]
+          ? Icons.format_size_outlined
+          : Icons.format_size_rounded,
+      initial: ((appStateSettings["textScale"] as num?)?.toDouble() ?? 1.0)
+          .toString(),
+      items: ["0.85", "0.9", "1.0", "1.1", "1.2", "1.3"],
+      onChanged: (value) async {
+        await updateSettings("textScale", double.parse(value),
+            updateGlobalState: true);
+      },
+      getLabel: (item) {
+        return (double.parse(item) * 100).round().toString() + "%";
+      },
+    );
+  }
+}
+
+class DateFormatSetting extends StatelessWidget {
+  const DateFormatSetting({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    DateTime example = DateTime(DateTime.now().year, 10, 13);
+    return SettingsContainerDropdown(
+      title: "Định dạng ngày",
+      icon: appStateSettings["outlinedIcons"]
+          ? Icons.calendar_today_outlined
+          : Icons.calendar_today_rounded,
+      initial: appStateSettings["dateFormat"] ?? "default",
+      items: ["default", ...numericDateFormatsWithoutYear.keys],
+      onChanged: (value) async {
+        await updateSettings("dateFormat", value, updateGlobalState: true);
+      },
+      getLabel: (item) {
+        if (item == "default") {
+          return DateFormat.MMMd(context.locale.toString()).format(example);
+        }
+        return DateFormat(item).format(example);
+      },
+    );
+  }
+}
+
+class ShowAttachmentButtonSetting extends StatelessWidget {
+  const ShowAttachmentButtonSetting({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SettingsContainerSwitch(
+      title: "Hiện nút đính kèm",
+      description: "Nút thêm tệp đính kèm dưới ô ghi chú khi thêm giao dịch",
+      icon: appStateSettings["outlinedIcons"]
+          ? Icons.attachment_outlined
+          : Icons.attachment_rounded,
+      initialValue: appStateSettings["showAttachmentButton"] != false,
+      onSwitched: (value) async {
+        await updateSettings("showAttachmentButton", value,
+            updateGlobalState: false);
       },
     );
   }

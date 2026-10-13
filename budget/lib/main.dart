@@ -166,6 +166,19 @@ class App extends StatelessWidget {
           ),
         );
 
+        // "Text size" setting, on top of the system text size
+        double textScale =
+            (appStateSettings["textScale"] as num?)?.toDouble() ?? 1.0;
+        if (textScale != 1.0) {
+          MediaQueryData mediaQuery = MediaQuery.of(context);
+          mainWidget = MediaQuery(
+            data: mediaQuery.copyWith(
+                textScaler: TextScaler.linear(
+                    mediaQuery.textScaler.scale(1) * textScale)),
+            child: mainWidget,
+          );
+        }
+
         if (kIsWeb) {
           return FadeIn(
               duration: Duration(milliseconds: 1000), child: mainWidget);
