@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import 'dart:math';
@@ -124,7 +123,8 @@ String? _decodeCanvas(JSObject canvas) {
   }
 }
 
-Future<String> _decodeImageUrl(String url) async {
+// Returns null when the image has no readable QR
+Future<String?> _tryDecodeImageUrl(String url) async {
   await _loadZXing();
   JSObject image = await _loadImage(url);
   int width = image.getProperty<JSNumber>('naturalWidth'.toJS).toDartInt;
@@ -141,7 +141,12 @@ Future<String> _decodeImageUrl(String url) async {
     text =
         _decodeCanvas(_drawOnCanvas(image, width, height, _maxRetryImageSide));
   }
-  if (text == null || text.isEmpty) {
+  return text == null || text.isEmpty ? null : text;
+}
+
+Future<String> _decodeImageUrl(String url) async {
+  String? text = await _tryDecodeImageUrl(url);
+  if (text == null) {
     throw VietQrImageException(
         'Không tìm thấy mã QR trong ảnh. Thử cắt sát mã QR rồi chọn lại.');
   }
@@ -151,6 +156,30 @@ Future<String> _decodeImageUrl(String url) async {
 Future<String> readQrFromImagePath(String path) {
   // On web, image_picker returns a blob: URL as the path
   return _decodeImageUrl(path);
+}
+
+JSObject get _urlApi => globalContext.getProperty<JSObject>('URL'.toJS);
+
+// Null when the blob is not an image or has no readable QR
+Future<String?> _tryDecodeBlob(JSObject blob) async {
+  String url =
+      _urlApi.callMethod<JSString>('createObjectURL'.toJS, blob).toDart;
+  try {
+    return await _tryDecodeImageUrl(url);
+  } on VietQrImageException {
+    return null;
+  } finally {
+    _urlApi.callMethod('revokeObjectURL'.toJS, url.toJS);
+  }
+}
+
+// Image URLs in copied HTML (<img src>) or a text/uri-list
+List<String> _imageUrlsInText(String text) {
+  return RegExp(
+          r"""data:image/[A-Za-z0-9.+-]+;base64,[A-Za-z0-9+/=]+|https?://[^"'\s<>]+""")
+      .allMatches(text)
+      .map((match) => match.group(0)!.replaceAll('&amp;', '&'))
+      .toList();
 }
 
 Future<String> readQrFromClipboard() async {
@@ -171,38 +200,62 @@ Future<String> readQrFromClipboard() async {
       throw VietQrImageException(
           'Không đọc được clipboard. Hãy bấm "Dán" khi iOS hỏi.');
     }
+    List<String> seenTypes = [];
+    bool sawImage = false;
+    String? plainText;
     for (JSObject item in items) {
       List<String> types = item
           .getProperty<JSArray<JSString>>('types'.toJS)
           .toDart
           .map((type) => type.toDart)
           .toList();
-      String? imageType =
-          types.where((type) => type.startsWith('image/')).firstOrNull;
-      if (imageType != null) {
-        JSObject blob = await item
-            .callMethod<JSPromise<JSObject>>('getType'.toJS, imageType.toJS)
-            .toDart;
-        JSObject urlApi = globalContext.getProperty<JSObject>('URL'.toJS);
-        String url =
-            urlApi.callMethod<JSString>('createObjectURL'.toJS, blob).toDart;
+      seenTypes.addAll(types);
+      // iOS can expose a copied photo under a type other than image/png,
+      // so every non-text type is tried as an image, images before text
+      List<String> ordered = [
+        ...types.where((type) => !type.startsWith('text/')),
+        ...types.where((type) => type.startsWith('text/')),
+      ];
+      for (String type in ordered) {
+        JSObject blob;
         try {
-          return await _decodeImageUrl(url);
-        } finally {
-          urlApi.callMethod('revokeObjectURL'.toJS, url.toJS);
+          blob = await item
+              .callMethod<JSPromise<JSObject>>('getType'.toJS, type.toJS)
+              .toDart;
+        } catch (e) {
+          continue;
         }
-      }
-      if (types.contains('text/plain')) {
-        JSObject blob = await item
-            .callMethod<JSPromise<JSObject>>('getType'.toJS, 'text/plain'.toJS)
-            .toDart;
-        String text =
+        if (!type.startsWith('text/')) {
+          String? text = await _tryDecodeBlob(blob);
+          if (text != null) return text;
+          if (type.startsWith('image/')) sawImage = true;
+          continue;
+        }
+        String content =
             (await blob.callMethod<JSPromise<JSString>>('text'.toJS).toDart)
                 .toDart;
-        if (text.trim().isNotEmpty) return text;
+        if (type == 'text/plain') {
+          if (content.trim().isNotEmpty) plainText ??= content;
+          continue;
+        }
+        for (String url in _imageUrlsInText(content)) {
+          String? text;
+          try {
+            text = await _tryDecodeImageUrl(url);
+          } on VietQrImageException {
+            text = null;
+          }
+          if (text != null) return text;
+        }
       }
     }
-    throw VietQrImageException('Clipboard không có ảnh QR hay chuỗi QR.');
+    if (plainText != null) return plainText;
+    if (sawImage) {
+      throw VietQrImageException('Không tìm thấy mã QR trong ảnh đã copy.');
+    }
+    String found = seenTypes.isEmpty ? 'trống' : seenTypes.join(', ');
+    throw VietQrImageException(
+        'Clipboard không có ảnh QR hay chuỗi QR (iOS trả về: $found).');
   }
 
   if (clipboard.has('readText')) {
