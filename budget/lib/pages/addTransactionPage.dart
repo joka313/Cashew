@@ -105,6 +105,7 @@ class AddTransactionPage extends StatefulWidget {
     this.selectedNotes,
     this.startInitialAddTransactionSequence = true,
     this.transferBalancePopup = false,
+    this.onTransactionAdded,
     required this.routesToPopAfterDelete,
   }) : super(key: key);
 
@@ -125,6 +126,8 @@ class AddTransactionPage extends StatefulWidget {
   final String? selectedNotes;
   final bool startInitialAddTransactionSequence;
   final bool transferBalancePopup;
+  // Called after the transaction was saved to the database
+  final void Function(Transaction transaction)? onTransactionAdded;
 
   @override
   _AddTransactionPageState createState() => _AddTransactionPageState();
@@ -561,6 +564,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
             await database.getTransactionFromRowId(rowId);
         print("Transaction just added:");
         print(transactionJustAdded);
+        widget.onTransactionAdded?.call(transactionJustAdded);
 
         // Do the flash animation only if the date was changed
         if (transactionJustAdded.dateCreated !=

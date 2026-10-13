@@ -40,6 +40,7 @@ import 'package:budget/widgets/util/rightSideClipper.dart';
 import 'package:flutter/services.dart';
 import 'package:budget/widgets/util/checkWidgetLaunch.dart';
 import 'package:flutter/foundation.dart';
+import 'package:budget/vietqr/vietqr_scan_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({
@@ -273,17 +274,34 @@ class HomePageState extends State<HomePage> with TickerProviderStateMixin {
                                 ),
                               )
                             : SizedBox.shrink(),
-                        Tooltip(
-                          message: "edit-home".tr(),
-                          child: IconButton(
-                            padding: EdgeInsetsDirectional.all(15),
-                            onPressed: () {
-                              pushRoute(context, EditHomePage());
-                            },
-                            icon: Icon(appStateSettings["outlinedIcons"]
-                                ? Icons.more_vert_outlined
-                                : Icons.more_vert_rounded),
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Tooltip(
+                              message: "Quét VietQR",
+                              child: IconButton(
+                                padding: EdgeInsetsDirectional.all(15),
+                                onPressed: () {
+                                  openVietQrScanFlow(context);
+                                },
+                                icon: Icon(appStateSettings["outlinedIcons"]
+                                    ? Icons.qr_code_scanner_outlined
+                                    : Icons.qr_code_scanner_rounded),
+                              ),
+                            ),
+                            Tooltip(
+                              message: "edit-home".tr(),
+                              child: IconButton(
+                                padding: EdgeInsetsDirectional.all(15),
+                                onPressed: () {
+                                  pushRoute(context, EditHomePage());
+                                },
+                                icon: Icon(appStateSettings["outlinedIcons"]
+                                    ? Icons.more_vert_outlined
+                                    : Icons.more_vert_rounded),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
