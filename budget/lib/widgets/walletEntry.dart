@@ -332,8 +332,10 @@ class AmountAccount extends StatelessWidget {
     double? roundedWalletWithTotal = (double.tryParse(
         absoluteZero(walletWithDetails.totalSpent ?? 0)
             .toStringAsFixed(walletWithDetails.wallet.decimals)));
+    // Colored by sign with either the arrows style or "colorful net totals"
     Color textColor =
-        appStateSettings["accountColorfulAmountsWithArrows"] == true
+        appStateSettings["accountColorfulAmountsWithArrows"] == true ||
+                appStateSettings["netTotalsColorful"] == true
             ? roundedWalletWithTotal == 0
                 ? getColor(context, "black")
                 : (walletWithDetails.totalSpent ?? 0) > 0

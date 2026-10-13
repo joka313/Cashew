@@ -706,6 +706,7 @@ class MoreOptionsPagePreferences extends StatelessWidget {
         OutlinedIconsSetting(),
         FontPickerSetting(),
         TextScaleSetting(),
+        TotalsColorSetting(),
         AppAnimationSetting(),
         CountingNumberAnimationSetting(),
         IncreaseTextContrastSetting(),
@@ -1228,6 +1229,45 @@ class TextScaleSetting extends StatelessWidget {
       },
       getLabel: (item) {
         return (double.parse(item) * 100).round().toString() + "%";
+      },
+    );
+  }
+}
+
+// Green/red totals by sign: net worth, net totals and account balances.
+// Uses the two existing (previously debug only) settings.
+class TotalsColorSetting extends StatelessWidget {
+  const TotalsColorSetting({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    String initial = appStateSettings["accountColorfulAmountsWithArrows"] == true
+        ? "colorful-arrows"
+        : appStateSettings["netTotalsColorful"] == true
+            ? "colorful"
+            : "simple";
+    return SettingsContainerDropdown(
+      title: "Màu số tổng",
+      description: "Net Worth, tổng ròng và số dư tài khoản",
+      icon: appStateSettings["outlinedIcons"]
+          ? Icons.format_color_text_outlined
+          : Icons.format_color_text_rounded,
+      initial: initial,
+      items: ["simple", "colorful", "colorful-arrows"],
+      onChanged: (value) async {
+        await updateSettings("netTotalsColorful", value != "simple",
+            updateGlobalState: false);
+        await updateSettings(
+            "accountColorfulAmountsWithArrows", value == "colorful-arrows",
+            updateGlobalState: true);
+      },
+      getLabel: (item) {
+        return {
+              "simple": "Đơn giản",
+              "colorful": "Xanh/đỏ theo dấu",
+              "colorful-arrows": "Xanh/đỏ + mũi tên",
+            }[item] ??
+            item;
       },
     );
   }

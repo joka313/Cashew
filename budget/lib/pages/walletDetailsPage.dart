@@ -785,6 +785,24 @@ class WalletDetailsPageState extends State<WalletDetailsPage>
                             ),
                             absolute: false,
                             textColor: getColor(context, "black"),
+                            // "Total amount color" setting: green/red by sign
+                            getTextColor:
+                                appStateSettings["netTotalsColorful"] != true
+                                    ? null
+                                    : (double amount) {
+                                        double? rounded = double.tryParse(
+                                            absoluteZero(amount)
+                                                .toStringAsFixed(
+                                                    widget.wallet?.decimals ??
+                                                        2));
+                                        return rounded == 0
+                                            ? getColor(context, "black")
+                                            : amount > 0
+                                                ? getColor(
+                                                    context, "incomeAmount")
+                                                : getColor(
+                                                    context, "expenseAmount");
+                                      },
                             label: "net-total".tr(),
                             totalWithCountStream:
                                 database.watchTotalWithCountOfWallet(
@@ -2839,6 +2857,7 @@ class AmountSpentEntryRow extends StatelessWidget {
     this.extraText,
     this.absolute = true,
     this.invertSign = false,
+    this.getTextColor,
   });
   final Color textColor;
   final String label;
@@ -2850,6 +2869,8 @@ class AmountSpentEntryRow extends StatelessWidget {
   final String? extraText;
   final bool absolute;
   final bool invertSign;
+  // Overrides textColor based on the total, e.g. green/red by sign
+  final Color? Function(double total)? getTextColor;
 
   @override
   Widget build(BuildContext context) {
@@ -2981,7 +3002,7 @@ class AmountSpentEntryRow extends StatelessWidget {
                                 ),
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                textColor: textColor,
+                                textColor: getTextColor?.call(totalSpent) ?? textColor,
                               );
                             },
                           ),

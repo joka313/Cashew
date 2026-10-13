@@ -1116,7 +1116,15 @@ class TransactionsEntriesSpendingSummary extends StatelessWidget {
                                           number,
                                           finalNumber: netSpending.abs()),
                                   fontSize: 15,
-                                  textColor: getColor(context, "black"),
+                                  // "Total amount color" setting
+                                  textColor: appStateSettings[
+                                                  "netTotalsColorful"] !=
+                                              true ||
+                                          netSpending.abs() < 0.000001
+                                      ? getColor(context, "black")
+                                      : netSpending > 0
+                                          ? getColor(context, "incomeAmount")
+                                          : getColor(context, "expenseAmount"),
                                   autoSizeText: true,
                                   minFontSize: 9,
                                   maxLines: 1,
