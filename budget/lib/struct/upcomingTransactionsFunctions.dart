@@ -18,6 +18,29 @@ import 'package:flutter/material.dart';
 import 'package:budget/widgets/openBottomSheet.dart';
 import 'package:provider/provider.dart';
 
+// Adding months must not overflow into the following month: Jan 31 + 1 month
+// is Feb 28/29, not Mar 3. A date on the last day of its month stays on the
+// last day of the month (Jan 31 -> Feb 28 -> Mar 31).
+DateTime addRepeatPeriod(DateTime date,
+    {int yearOffset = 0, int monthOffset = 0, int dayOffset = 0}) {
+  int day = date.day + dayOffset;
+  if (dayOffset == 0 && (yearOffset != 0 || monthOffset != 0)) {
+    DateTime targetMonth =
+        DateTime(date.year + yearOffset, date.month + monthOffset);
+    int lastDayOfTarget =
+        DateTime(targetMonth.year, targetMonth.month + 1, 0).day;
+    bool isLastDayOfMonth =
+        date.day == DateTime(date.year, date.month + 1, 0).day;
+    day = isLastDayOfMonth || date.day > lastDayOfTarget
+        ? lastDayOfTarget
+        : date.day;
+    return DateTime(targetMonth.year, targetMonth.month, day, date.hour,
+        date.minute, date.second, date.millisecond);
+  }
+  return DateTime(date.year + yearOffset, date.month + monthOffset, day,
+      date.hour, date.minute, date.second, date.millisecond);
+}
+
 Future createNewSubscriptionTransaction(
     BuildContext context, Transaction transaction,
     {String? closelyRelatedPairedTransactionFk}) async {
@@ -36,14 +59,11 @@ Future createNewSubscriptionTransaction(
       } else if (transaction.reoccurrence == BudgetReoccurence.daily) {
         dayOffset = transaction.periodLength ?? 0;
       }
-      DateTime newDate = DateTime(
-        transaction.dateCreated.year + yearOffset,
-        transaction.dateCreated.month + monthOffset,
-        transaction.dateCreated.day + dayOffset,
-        transaction.dateCreated.hour,
-        transaction.dateCreated.minute,
-        transaction.dateCreated.second,
-        transaction.dateCreated.millisecond,
+      DateTime newDate = addRepeatPeriod(
+        transaction.dateCreated,
+        yearOffset: yearOffset,
+        monthOffset: monthOffset,
+        dayOffset: dayOffset,
       );
 
       // After end date
@@ -169,14 +189,11 @@ int? countTransactionOccurrences({
   while (!endDate.isBefore(currentDate)) {
     occurrenceCount++;
 
-    currentDate = DateTime(
-      currentDate.year + yearOffset,
-      currentDate.month + monthOffset,
-      currentDate.day + dayOffset,
-      currentDate.hour,
-      currentDate.minute,
-      currentDate.second,
-      currentDate.millisecond,
+    currentDate = addRepeatPeriod(
+      currentDate,
+      yearOffset: yearOffset,
+      monthOffset: monthOffset,
+      dayOffset: dayOffset,
     );
 
     if (endDate.isBefore(currentDate)) {
