@@ -5832,7 +5832,10 @@ class FinanceDatabase extends _$FinanceDatabase {
     Expression<bool> isNotPaid = searchFilters.paidStatus.length <= 0
         ? Constant(true)
         : searchFilters.paidStatus.contains(PaidStatus.notPaid)
+            // Skipped transactions are not paid either, but they will never be
+            // paid so they must not count as upcoming (they have their own filter)
             ? tbl.paid.equals(false) &
+                tbl.skipPaid.equals(false) &
                 tbl.type.isNotNull() &
                 tbl.type.isNotInValues([
                   TransactionSpecialType.debt,

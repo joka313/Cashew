@@ -2,6 +2,7 @@ import 'package:budget/colors.dart';
 import 'package:budget/database/tables.dart';
 import 'package:budget/pages/upcomingOverdueTransactionsPage.dart';
 import 'package:budget/struct/databaseGlobal.dart';
+import 'package:budget/struct/settings.dart';
 import 'package:budget/widgets/framework/popupFramework.dart';
 import 'package:budget/widgets/navigationFramework.dart';
 import 'package:budget/widgets/openBottomSheet.dart';
@@ -42,6 +43,7 @@ class HomePageUpcomingTransactions extends StatelessWidget {
                     isOverdueTransactions: false,
                     followCustomPeriodCycle: true,
                     cycleSettingsExtension: "OverdueUpcoming",
+                    forcedDateTimeRange: upcomingFutureDaysRange(),
                   ),
                   textColor: getColor(context, "unPaidUpcoming"),
                   onLongPress: () async {
@@ -79,6 +81,19 @@ class HomePageUpcomingTransactions extends StatelessWidget {
       ),
     );
   }
+}
+
+// "Past days" counts back from today, which suits overdue transactions. Upcoming
+// transactions are all in the future, so for them count the days forward.
+DateTimeRange? upcomingFutureDaysRange() {
+  if (appStateSettings["selectedPeriodCycleTypeOverdueUpcoming"] !=
+      CycleType.pastDays.index) return null;
+  int days = appStateSettings["customPeriodPastDaysOverdueUpcoming"] ?? 0;
+  DateTime now = DateTime.now();
+  return DateTimeRange(
+    start: DateTime(now.year, now.month, now.day),
+    end: DateTime(now.year, now.month, now.day + days, 23, 59, 59),
+  );
 }
 
 Future openOverdueUpcomingSettings(BuildContext context) {
