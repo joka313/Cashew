@@ -1129,6 +1129,48 @@ class _TransferBalancePopupState extends State<TransferBalancePopup> {
     );
   }
 
+  // The account balance before and after this transfer, in its own currency.
+  // Uses the same conversion as transferBalance below.
+  Widget resultingBalance(TransactionWallet? wallet, {required bool isFrom}) {
+    if (wallet == null) return SizedBox.shrink();
+    AllWallets allWallets = Provider.of<AllWallets>(context);
+    if (allWallets.indexedByPk[wallet.walletPk] == null ||
+        allWallets.indexedByPk[appStateSettings["selectedWalletPk"]] == null) {
+      return SizedBox.shrink();
+    }
+    double amountInPrimary = enteredAmount *
+        (walletForCurrency == null
+            ? 1
+            : amountRatioToPrimaryCurrencyGivenPk(
+                allWallets, walletForCurrency!.walletPk));
+    double change = amountInPrimary *
+        (isFrom
+            ? getAmountRatioWalletTransferFrom(allWallets, wallet.walletPk)
+            : getAmountRatioWalletTransferTo(allWallets, wallet.walletPk));
+    return StreamBuilder<double?>(
+      stream: database.watchTotalOfWalletNoConversion(wallet.walletPk),
+      builder: (context, snapshot) {
+        double balance = snapshot.data ?? 0;
+        String format(double amount) => convertToMoney(allWallets, amount,
+            currencyKey: wallet.currency, decimals: wallet.decimals);
+        return Padding(
+          padding: const EdgeInsetsDirectional.only(top: 2),
+          child: TextFont(
+            text: wallet.name +
+                ": " +
+                format(balance) +
+                " → " +
+                format(balance + change),
+            fontSize: 14,
+            textColor: getColor(context, "textLight"),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> transferBalance() async {
     AllWallets allWallets = Provider.of<AllWallets>(context, listen: false);
 
@@ -1373,6 +1415,9 @@ class _TransferBalancePopupState extends State<TransferBalancePopup> {
               }),
             ],
           ),
+          SizedBox(height: 8),
+          resultingBalance(walletFrom, isFrom: true),
+          resultingBalance(walletTo, isFrom: false),
           SelectAmount(
             amountTappableBuilder: (onLongPress, amountConverted) {
               return Padding(
