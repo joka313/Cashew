@@ -1,3 +1,4 @@
+import 'package:budget/database/searchFolding.dart';
 import 'package:budget/functions.dart';
 import 'package:budget/pages/addBudgetPage.dart';
 import 'package:budget/pages/homePage/homePageLineGraph.dart';
@@ -1979,8 +1980,7 @@ class FinanceDatabase extends _$FinanceDatabase {
               (searchFor == null
                   ? Constant(true)
                   : b.name
-                      .collate(Collate.noCase)
-                      .like("%" + (searchFor) + "%")))
+                      .likeSearch((searchFor))))
           ..orderBy([
             if (archivedLast) (b) => OrderingTerm.asc(b.archived),
             (b) => OrderingTerm.asc(b.order)
@@ -2024,8 +2024,7 @@ class FinanceDatabase extends _$FinanceDatabase {
           categories.categoryPk.equalsExp(associatedTitles.categoryFk)),
     ])
                   ..where(associatedTitles.title
-                          .collate(Collate.noCase)
-                          .like("%" + title + "%") &
+                          .likeSearch(title) &
                       associatedTitles.title.isNotIn(excludeTitles))
                   // Group by happens before the orderby,
                   // so we get titles with the least order if they are grouped
@@ -2116,7 +2115,7 @@ class FinanceDatabase extends _$FinanceDatabase {
     if (alsoSearchCategories)
       list.addAll((await (select(categories)
                 ..where((c) =>
-                    c.name.collate(Collate.noCase).like("%" + title + "%"))
+                    c.name.likeSearch(title))
                 ..orderBy([
                   (c) => OrderingTerm.asc(c.mainCategoryPk),
                   (c) => OrderingTerm.asc(c.order),
@@ -2396,7 +2395,7 @@ class FinanceDatabase extends _$FinanceDatabase {
     return (select(wallets)
           ..where((w) => (searchFor == null
               ? Constant(true)
-              : w.name.collate(Collate.noCase).like("%" + (searchFor) + "%")))
+              : w.name.likeSearch((searchFor))))
           ..orderBy([(w) => OrderingTerm.asc(w.order)])
           ..limit(limit ?? DEFAULT_LIMIT, offset: offset ?? DEFAULT_OFFSET))
         .watch();
@@ -2418,8 +2417,7 @@ class FinanceDatabase extends _$FinanceDatabase {
               (searchFor == null
                   ? Constant(true)
                   : w.name
-                      .collate(Collate.noCase)
-                      .like("%" + (searchFor) + "%"))))
+                      .likeSearch((searchFor)))))
           ..orderBy([(w) => OrderingTerm.asc(w.order)]))
         .join([
       leftOuterJoin(
@@ -2855,8 +2853,7 @@ class FinanceDatabase extends _$FinanceDatabase {
           ..where(searchFor == null
               ? Constant(true)
               : associatedTitles.title
-                  .collate(Collate.noCase)
-                  .like("%" + (searchFor) + "%"))
+                  .likeSearch((searchFor)))
           ..orderBy([OrderingTerm.desc(associatedTitles.order)])
         // ..limit(limit ?? DEFAULT_LIMIT, offset: offset ?? DEFAULT_OFFSET)
         )
@@ -2908,7 +2905,7 @@ class FinanceDatabase extends _$FinanceDatabase {
           .equals(searchFor.toLowerCase().trim()));
     if (category == null)
       category = await getCategory(
-          categories.name.collate(Collate.noCase).like("%" + searchFor + "%"));
+          categories.name.likeSearch(searchFor));
     return category;
   }
 
@@ -2929,7 +2926,7 @@ class FinanceDatabase extends _$FinanceDatabase {
           wallets.name.lower().trim().equals(searchFor.toLowerCase().trim()));
     if (wallet == null)
       wallet = await getCategory(
-          wallets.name.collate(Collate.noCase).like("%" + searchFor + "%"));
+          wallets.name.likeSearch(searchFor));
     return wallet;
   }
 
@@ -4352,8 +4349,7 @@ class FinanceDatabase extends _$FinanceDatabase {
               (searchFor == null
                   ? Constant(true)
                   : c.name
-                      .collate(Collate.noCase)
-                      .like("%" + (searchFor) + "%"))))
+                      .likeSearch((searchFor)))))
           ..orderBy([
             (c) => OrderingTerm.asc(c.mainCategoryPk),
             (c) => OrderingTerm.asc(c.order),
@@ -4438,8 +4434,7 @@ class FinanceDatabase extends _$FinanceDatabase {
               (searchFor == null
                   ? Constant(true)
                   : c.name
-                      .collate(Collate.noCase)
-                      .like("%" + (searchFor) + "%"))))
+                      .likeSearch((searchFor)))))
           ..orderBy([
             (c) => OrderingTerm.asc(c.order),
           ]))
@@ -4557,8 +4552,7 @@ class FinanceDatabase extends _$FinanceDatabase {
               (searchFor == null
                   ? Constant(true)
                   : i.name
-                      .collate(Collate.noCase)
-                      .like("%" + (searchFor) + "%")))
+                      .likeSearch((searchFor))))
           ..orderBy([
             if (archivedLast) (i) => OrderingTerm.asc(i.archived),
             (i) => OrderingTerm.asc(i.order),
@@ -5929,15 +5923,14 @@ class FinanceDatabase extends _$FinanceDatabase {
         stringToSplit = stringToSplit.substring(0, stringToSplit.length - 1);
       }
       for (String titleContain in stringToSplit.split(", ")) {
-        isInTitleContains |=
-            tbl.name.collate(Collate.noCase).like("%" + titleContain + "%");
+        isInTitleContains |= tbl.name.likeSearchTerms(titleContain);
       }
     }
 
     String? noteContains = searchFilters.noteContains;
     Expression<bool> isInNoteContains = noteContains == null
         ? Constant(true)
-        : tbl.note.collate(Collate.noCase).like("%" + noteContains + "%");
+        : tbl.note.likeSearchTerms(noteContains);
 
     return isInWalletPks &
         isInCategoryPks &
@@ -5973,31 +5966,26 @@ class FinanceDatabase extends _$FinanceDatabase {
         ? Constant(true)
         : (withCategories == true
                 ? categories.name
-                    .collate(Collate.noCase)
-                    .like("%" + searchQuery + "%")
+                    .likeSearch(searchQuery)
                 : Constant(false)) |
             (joinedWithSubcategoriesTable != null
                 ? joinedWithSubcategoriesTable.name
-                    .collate(Collate.noCase)
-                    .like("%" + searchQuery + "%")
+                    .likeSearch(searchQuery)
                 : Constant(false)) |
             (withBudgets == true
                 ? budgets.name
-                    .collate(Collate.noCase)
-                    .like("%" + searchQuery + "%")
+                    .likeSearch(searchQuery)
                 : Constant(false)) |
             (withObjectives == true
                 ? objectives.name
-                    .collate(Collate.noCase)
-                    .like("%" + searchQuery + "%")
+                    .likeSearch(searchQuery)
                 : Constant(false)) |
             (joinedWithObjectiveLoans != null
                 ? joinedWithObjectiveLoans.name
-                    .collate(Collate.noCase)
-                    .like("%" + searchQuery + "%")
+                    .likeSearch(searchQuery)
                 : Constant(false)) |
-            tbl.name.collate(Collate.noCase).like("%" + searchQuery + "%") |
-            tbl.note.collate(Collate.noCase).like("%" + searchQuery + "%") |
+            tbl.name.likeSearch(searchQuery) |
+            tbl.note.likeSearch(searchQuery) |
             onlyShowIfSearchQueryDateIsDate(searchQuery, tbl) |
             onlyShowIfSearchQueryAmount(searchQuery, tbl.amount);
   }
@@ -6936,8 +6924,7 @@ class FinanceDatabase extends _$FinanceDatabase {
                     ))
                   // Only apply this tab specific total when searching
                   : ((objectives.name
-                      .collate(Collate.noCase)
-                      .like("%" + (searchString ?? "") + "%")))) &
+                      .likeSearch((searchString ?? ""))))) &
               transactions.paid.equals(true) &
               transactions.walletFk.equals(wallet.walletPk) &
               (isCredit == null
@@ -7002,8 +6989,7 @@ class FinanceDatabase extends _$FinanceDatabase {
                 ? Constant(true)
                 // Only apply this tab specific total when searching
                 : (objectives.name
-                    .collate(Collate.noCase)
-                    .like("%" + (searchString ?? "") + "%"))) &
+                    .likeSearch((searchString ?? "")))) &
             (isCredit == null
                 ? Constant(true)
                 : isCredit
