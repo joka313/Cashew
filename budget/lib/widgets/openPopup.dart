@@ -31,6 +31,8 @@ Future<T?> openPopup<T extends Object?>(
   Function(BuildContext context)? onCancelWithBoxContext,
   VoidCallback? onExtra,
   VoidCallback? onExtra2,
+  VoidCallback? onSubmitLongPress,
+  VoidCallback? onExtraLongPress,
   bool barrierDismissible = true,
 }) {
   if ((contextPassed ?? navigatorKey.currentContext) == null)
@@ -235,6 +237,7 @@ Future<T?> openPopup<T extends Object?>(
                                                 textColor: onPrimaryButtonColor,
                                                 label: onExtraLabel,
                                                 onTap: onExtra ?? () {},
+                                                onLongPress: onExtraLongPress,
                                               ),
                                             ),
                                           )
@@ -251,6 +254,7 @@ Future<T?> openPopup<T extends Object?>(
                                                 textColor: onPrimaryButtonColor,
                                                 label: onSubmitLabel,
                                                 onTap: onSubmit ?? () {},
+                                                onLongPress: onSubmitLongPress,
                                               ),
                                             ),
                                           )

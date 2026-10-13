@@ -264,7 +264,9 @@ Future openPayPopup(
     description: (transaction.income
             ? "deposit-description".tr()
             : "pay-description".tr()) +
-        repeatsLeftLabel,
+        repeatsLeftLabel +
+        "\n" +
+        "Giữ nút để chọn ngày thực hiện.",
     onCancelLabel: "cancel".tr().tr(),
     onCancel: () {
       popRoute(context, false);
@@ -276,6 +278,16 @@ Future openPayPopup(
       await markAsSkipped(
         transaction: transaction,
       );
+    },
+    onExtraLongPress: () {
+      popRoute(context);
+      completeAtChosenDate(context, transaction,
+          skip: true, runBefore: runBefore);
+    },
+    onSubmitLongPress: () {
+      popRoute(context);
+      completeAtChosenDate(context, transaction,
+          skip: false, runBefore: runBefore);
     },
     onSubmitLabel: transaction.income ? "deposit".tr() : "pay".tr(),
     onSubmit: () async {
@@ -305,8 +317,50 @@ Future openPayPopup(
   );
 }
 
+// Long press on Pay/Skip: complete it now or at the transaction's own date
+Future completeAtChosenDate(BuildContext context, Transaction transaction,
+    {required bool skip, Function? runBefore}) async {
+  String transactionName = await getTransactionLabel(transaction);
+  String dueDate = getWordedDateShort(transaction.dateCreated,
+          includeYear: transaction.dateCreated.year != DateTime.now().year) +
+      " " +
+      DateFormat.Hm().format(transaction.dateCreated);
+  Future complete(bool onOriginalDay) async {
+    if (runBefore != null) await runBefore();
+    popRoute(context);
+    if (skip) {
+      await markAsSkipped(
+          transaction: transaction, onOriginalDay: onOriginalDay);
+    } else {
+      await markAsPaid(transaction: transaction, onOriginalDay: onOriginalDay);
+    }
+  }
+
+  await openPopup(
+    context,
+    icon: appStateSettings["outlinedIcons"]
+        ? Icons.event_outlined
+        : Icons.event_rounded,
+    title: skip
+        ? "Bỏ qua tính theo ngày nào?"
+        : (transaction.income ? "deposit".tr() : "pay".tr()) +
+            " tính theo ngày nào?",
+    subtitle: transactionName,
+    onCancelLabel: "cancel".tr(),
+    onCancel: () {
+      popRoute(context);
+    },
+    onExtraLabel: "Bây giờ",
+    onExtra: () => complete(false),
+    onSubmitLabel: "Ngày giao dịch (" + dueDate + ")",
+    onSubmit: () => complete(true),
+  );
+}
+
 Future markAsPaid({
   required Transaction transaction,
+  // Null follows the "mark as paid on original day" setting
+  bool? onOriginalDay,
   // Avoid infinite recursion
   bool updatingCloselyRelated = false,
 }) async {
@@ -317,6 +371,7 @@ Future markAsPaid({
     if (closelyRelatedTransferCorrectionTransaction != null) {
       await markAsPaid(
         transaction: closelyRelatedTransferCorrectionTransaction,
+        onOriginalDay: onOriginalDay,
         updatingCloselyRelated: true,
       );
       closelyRelatedPairedTransactionFk =
@@ -326,7 +381,9 @@ Future markAsPaid({
   Transaction transactionNew = transaction.copyWith(
     paid: true,
     dateCreated:
-        appStateSettings["markAsPaidOnOriginalDay"] ? null : DateTime.now(),
+        (onOriginalDay ?? appStateSettings["markAsPaidOnOriginalDay"] == true)
+            ? null
+            : DateTime.now(),
     createdAnotherFutureTransaction: Value(true),
     originalDateDue: Value(transaction.dateCreated),
   );
@@ -341,6 +398,7 @@ Future markAsPaid({
 
 Future markAsSkipped({
   required Transaction transaction,
+  bool onOriginalDay = false,
   // Avoid infinite recursion
   bool updatingCloselyRelated = false,
 }) async {
@@ -351,6 +409,7 @@ Future markAsSkipped({
     if (closelyRelatedTransferCorrectionTransaction != null) {
       await markAsSkipped(
         transaction: closelyRelatedTransferCorrectionTransaction,
+        onOriginalDay: onOriginalDay,
         updatingCloselyRelated: true,
       );
       closelyRelatedPairedTransactionFk =
@@ -359,7 +418,7 @@ Future markAsSkipped({
   }
   Transaction transactionNew = transaction.copyWith(
     skipPaid: true,
-    dateCreated: DateTime.now(),
+    dateCreated: onOriginalDay ? null : DateTime.now(),
     createdAnotherFutureTransaction: Value(true),
   );
   await database.createOrUpdateTransaction(transactionNew);
