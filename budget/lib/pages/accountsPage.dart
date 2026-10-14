@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:budget/colors.dart';
 import 'package:budget/functions.dart';
 import 'package:budget/main.dart';
@@ -422,8 +423,12 @@ class EnableSignInWithGoogleFlyIn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (appStateSettings["enableGoogleLoginFlyIn"] != true ||
-        getIsFullScreen(context) == false) return SizedBox.shrink();
+    bool webSyncReminder = kIsWeb &&
+        appStateSettings["webSyncReminder"] != false &&
+        appStateSettings["backupSync"] != false;
+    if (webSyncReminder == false &&
+        (appStateSettings["enableGoogleLoginFlyIn"] != true ||
+            getIsFullScreen(context) == false)) return SizedBox.shrink();
     return const SignInWithGoogleFlyIn();
   }
 }
@@ -437,11 +442,35 @@ class SignInWithGoogleFlyIn extends StatefulWidget {
 
 class _SignInWithGoogleFlyInState extends State<SignInWithGoogleFlyIn> {
   bool hide = true;
+  // The sign-in can be lost later (expired token), check again regularly
+  Timer? recheckTimer;
 
   @override
   void initState() {
     checkCloudFunctionsStatus();
+    recheckTimer = Timer.periodic(Duration(seconds: 10), (_) {
+      if (mounted) setState(() {});
+    });
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    recheckTimer?.cancel();
+    super.dispose();
+  }
+
+  // Last time the data reached Google Drive (sync or backup)
+  String lastSavedOnlineLabel() {
+    List<DateTime> dates = [
+      DateTime.tryParse(appStateSettings["lastCloudSync"] ?? ""),
+      // lastBackup has a placeholder default before the first sign-in
+      if (appStateSettings["hasSignedIn"] == true)
+        DateTime.tryParse(appStateSettings["lastBackup"] ?? ""),
+    ].whereType<DateTime>().toList();
+    if (dates.isEmpty) return "Chưa từng lưu online.";
+    dates.sort();
+    return "Lần lưu online gần nhất: " + getTimeAgo(dates.last) + ".";
   }
 
   void checkCloudFunctionsStatus() {
@@ -520,7 +549,7 @@ class _SignInWithGoogleFlyInState extends State<SignInWithGoogleFlyIn> {
                                       ),
                                       SizedBox(width: 10),
                                       TextFont(
-                                        text: "sign-in-with-google".tr(),
+                                        text: "Chưa đồng bộ Google Drive",
                                         fontWeight: FontWeight.bold,
                                         fontSize: 18,
                                       ),
@@ -560,12 +589,11 @@ class _SignInWithGoogleFlyInState extends State<SignInWithGoogleFlyIn> {
                             padding: const EdgeInsetsDirectional.symmetric(
                                 horizontal: 22, vertical: 12),
                             child: Button(
-                              label: "Continue with Google",
+                              label: "Đồng bộ ngay",
                               onTap: () async {
-                                await signInGoogle();
-                                setState(() {
-                                  hide = true;
-                                });
+                                // Signs in, syncs and backs up right away
+                                await signInAndSync(context, next: () {});
+                                setState(() {});
                               },
                               color: Theme.of(context).colorScheme.primary,
                               textColor:
@@ -577,7 +605,9 @@ class _SignInWithGoogleFlyInState extends State<SignInWithGoogleFlyIn> {
                             padding: const EdgeInsetsDirectional.only(
                                 start: 22, end: 22, bottom: 22),
                             child: TextFont(
-                              text: "onboarding-info-3".tr(),
+                              text:
+                                  "Dữ liệu đang chỉ nằm trên máy này. Bấm để đăng nhập Google, sau đó mọi thay đổi sẽ tự lưu lên Google Drive. " +
+                                      lastSavedOnlineLabel(),
                               maxLines: 10,
                               fontSize: 15,
                             ),

@@ -137,6 +137,9 @@ Future<Map<String, dynamic>> getDefaultPreferences() async {
     "lastLoginVersion": "",
     "numLogins": 0,
     "enableGoogleLoginFlyIn": false,
+    // Web: remind to connect Google Drive when not signed in, data is only
+    // saved online while signed in
+    "webSyncReminder": true,
     "openedStoreRating": false,
     "dismissedStoreRating": false,
     "submittedFeedback": false,

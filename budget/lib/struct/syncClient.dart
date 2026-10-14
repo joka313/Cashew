@@ -123,30 +123,47 @@ Future<bool> createSyncBackup(
     return false;
   }
 
-  final authHeaders = await googleUser!.authHeaders;
-  final authenticateClient = GoogleAuthClient(authHeaders);
-  drive.DriveApi driveApi = drive.DriveApi(authenticateClient);
-  if (driveApi == null) {
-    if (changeMadeSync)
-      loadingIndeterminateKey.currentState?.setVisibility(false);
-    throw "Failed to login to Google Drive";
-  }
+  try {
+    final authHeaders = await googleUser!.authHeaders;
+    final authenticateClient = GoogleAuthClient(authHeaders);
+    drive.DriveApi driveApi = drive.DriveApi(authenticateClient);
+    if (driveApi == null) {
+      if (changeMadeSync)
+        loadingIndeterminateKey.currentState?.setVisibility(false);
+      throw "Failed to login to Google Drive";
+    }
 
-  drive.FileList fileList = await driveApi.files.list(
-      spaces: 'appDataFolder', $fields: 'files(id, name, modifiedTime, size)');
-  List<drive.File>? files = fileList.files;
+    drive.FileList fileList = await driveApi.files.list(
+        spaces: 'appDataFolder',
+        $fields: 'files(id, name, modifiedTime, size)');
+    List<drive.File>? files = fileList.files;
 
-  for (drive.File file in files ?? []) {
-    if (isCurrentDeviceSyncBackupFile(file.name)) {
-      try {
-        await deleteBackup(driveApi, file.id ?? "");
-      } catch (e) {
-        print(e.toString());
+    for (drive.File file in files ?? []) {
+      if (isCurrentDeviceSyncBackupFile(file.name)) {
+        try {
+          await deleteBackup(driveApi, file.id ?? "");
+        } catch (e) {
+          print(e.toString());
+        }
       }
     }
+    await createBackup(null,
+        silentBackup: true, deleteOldBackups: true, clientIDForSync: clientID);
+  } catch (e) {
+    print("Sync backup failed: " + e.toString());
+    if (changeMadeSync)
+      loadingIndeterminateKey.currentState?.setVisibility(false);
+    // On the web the Google access token expires after about an hour and
+    // cannot be renewed without a tap. Forget the user so the
+    // "sync with Google" reminder shows again instead of failing silently.
+    if (kIsWeb && e is drive.DetailedApiRequestError && e.status == 401) {
+      googleUser = null;
+    }
+    return false;
   }
-  await createBackup(null,
-      silentBackup: true, deleteOldBackups: true, clientIDForSync: clientID);
+  // Shown by the sync reminder as the last time data was saved online
+  await updateSettings("lastCloudSync", DateTime.now().toString(),
+      updateGlobalState: false);
   if (changeMadeSync)
     loadingIndeterminateKey.currentState?.setVisibility(false);
   return true;
