@@ -259,10 +259,8 @@ class BottomNavBarState extends State<BottomNavBar> {
               navigationBarIconBuilder: (NavBarIconData iconData) {
                 return NavigationDestination(
                   icon: Icon(iconData.iconData, size: iconData.iconSize),
-                  label: iconData.label.tr().length > 15 &&
-                          iconData.labelShort != null
-                      ? (iconData.labelShort ?? "").tr()
-                      : iconData.label.tr(),
+                  // Short labels keep the 5 slot bar on one line
+                  label: (iconData.labelShort ?? iconData.label).tr(),
                   tooltip: "",
                 );
               },
@@ -275,10 +273,8 @@ class BottomNavBarState extends State<BottomNavBar> {
               navigationBarIconBuilder: (NavBarIconData iconData) {
                 return NavigationDestination(
                   icon: Icon(iconData.iconData, size: iconData.iconSize),
-                  label: iconData.label.tr().length > 15 &&
-                          iconData.labelShort != null
-                      ? (iconData.labelShort ?? "").tr()
-                      : iconData.label.tr(),
+                  // Short labels keep the 5 slot bar on one line
+                  label: (iconData.labelShort ?? iconData.label).tr(),
                   tooltip: "",
                 );
               },
@@ -297,10 +293,8 @@ class BottomNavBarState extends State<BottomNavBar> {
               navigationBarIconBuilder: (NavBarIconData iconData) {
                 return NavigationDestination(
                   icon: Icon(iconData.iconData, size: iconData.iconSize),
-                  label: iconData.label.tr().length > 15 &&
-                          iconData.labelShort != null
-                      ? (iconData.labelShort ?? "").tr()
-                      : iconData.label.tr(),
+                  // Short labels keep the 5 slot bar on one line
+                  label: (iconData.labelShort ?? iconData.label).tr(),
                   tooltip: "",
                 );
               },
@@ -336,37 +330,41 @@ class BottomNavBarState extends State<BottomNavBar> {
   }
 }
 
-const double _scanButtonSize = 60;
+const double _scanButtonSize = 52;
 // How far the scan button sticks out above the bar
-const double _scanButtonRaise = 14;
+const double _scanButtonRaise = 10;
 
-// Round VietQR scan button in the middle of the bottom navigation bar
+// VietQR scan button in the middle of the bottom navigation bar, styled like
+// the add transaction button (same colors, corner radius and shadow)
 class NavBarScanButton extends StatelessWidget {
   const NavBarScanButton({super.key});
 
   @override
   Widget build(BuildContext context) {
-    bool isLight = Theme.of(context).brightness == Brightness.light;
-    Color background = isLight ? Color(0xFF1C1C1E) : Colors.white;
-    Color foreground = isLight ? Colors.white : Color(0xFF1C1C1E);
+    ColorScheme colorScheme = Theme.of(context).colorScheme;
     return Tooltip(
       message: "Quét VietQR",
       child: Container(
         width: _scanButtonSize,
         height: _scanButtonSize,
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(isLight ? 0.25 : 0.4),
-              blurRadius: 12,
-              offset: Offset(0, 4),
+              color: Colors.black.withOpacity(
+                  Theme.of(context).brightness == Brightness.light
+                      ? 0.18
+                      : 0.35),
+              blurRadius: 10,
+              offset: Offset(0, 3),
             ),
           ],
         ),
         child: Material(
-          color: background,
-          shape: CircleBorder(),
+          color: colorScheme.secondary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: () {
@@ -378,8 +376,8 @@ class NavBarScanButton extends StatelessWidget {
               appStateSettings["outlinedIcons"]
                   ? Icons.qr_code_scanner_outlined
                   : Icons.qr_code_scanner_rounded,
-              color: foreground,
-              size: 28,
+              color: colorScheme.onSecondary,
+              size: 26,
             ),
           ),
         ),
