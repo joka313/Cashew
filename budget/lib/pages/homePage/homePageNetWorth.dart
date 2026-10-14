@@ -50,9 +50,7 @@ class HomePageNetWorth extends StatelessWidget {
                           await openNetWorthSettings(context);
                           homePageStateKey.currentState?.refreshState();
                         },
-                        label: appStateSettings["netWorthIncludeLoans"] == false
-                            ? "net-worth".tr()
-                            : "Tổng tài sản",
+                        label: "net-worth".tr(),
                         getTextColor: appStateSettings["netTotalsColorful"] !=
                                 true
                             ? null
