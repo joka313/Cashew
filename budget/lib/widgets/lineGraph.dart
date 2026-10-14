@@ -235,17 +235,23 @@ class _LineChartState extends State<_LineChart> with WidgetsBindingObserver {
                 child: MediaQuery(
                   data: MediaQuery.of(context)
                       .copyWith(textScaler: TextScaler.linear(1.0)),
-                  child: TextFont(
-                    overflow: TextOverflow.fade,
-                    maxLines: 1,
-                    softWrap: false,
-                    textAlign: TextAlign.end,
-                    text: getWordedNumber(context,
-                        Provider.of<AllWallets>(context, listen: false), value),
-                    textColor: dynamicPastel(context, widget.color,
-                            amount: 0.5, inverse: true)
-                        .withOpacity(0.3),
-                    fontSize: 13,
+                  // Long amounts (e.g. ₫128.5M) shrink to fit the axis
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: TextFont(
+                      maxLines: 1,
+                      softWrap: false,
+                      textAlign: TextAlign.end,
+                      text: getWordedNumber(
+                          context,
+                          Provider.of<AllWallets>(context, listen: false),
+                          value),
+                      textColor: dynamicPastel(context, widget.color,
+                              amount: 0.5, inverse: true)
+                          .withOpacity(0.3),
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               );

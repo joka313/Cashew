@@ -1,6 +1,7 @@
 import 'package:budget/colors.dart';
 import 'package:budget/struct/settings.dart';
 import 'package:budget/widgets/util/contextMenu.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 
@@ -53,6 +54,12 @@ class TextFont extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // TextOverflow.fade draws solid boxes instead of fading on the web (seen
+    // in iOS Safari, e.g. on chart axis labels), use an ellipsis there
+    final TextOverflow? overflow =
+        kIsWeb && this.overflow == TextOverflow.fade
+            ? TextOverflow.ellipsis
+            : this.overflow;
     Color finalTextColor = textColor ?? getColor(context, "black");
     if (appStateSettings["increaseTextContrast"] == true) {
       double threshold =
