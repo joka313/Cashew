@@ -1,3 +1,5 @@
+import 'package:budget/widgets/openPopup.dart';
+import 'package:budget/pages/addTransactionPage.dart';
 import 'package:budget/pages/transactionFilters.dart';
 import 'package:budget/pages/upcomingOverdueTransactionsPage.dart';
 import 'package:budget/struct/defaultPreferences.dart';
@@ -155,6 +157,26 @@ class TransactionsListPageState extends State<TransactionsListPage>
                 : Icons.search_rounded,
           ),
         ),
+        // Replaces the floating add button on phones
+        if (getIsFullScreen(context) == false)
+          IconButton(
+            padding: EdgeInsetsDirectional.all(15),
+            tooltip: "add-transaction".tr(),
+            onPressed: () {
+              pushRoute(
+                context,
+                AddTransactionPage(
+                  routesToPopAfterDelete: RoutesToPopAfterDelete.None,
+                ),
+              );
+            },
+            icon: Icon(
+              appStateSettings["outlinedIcons"]
+                  ? Icons.add_outlined
+                  : Icons.add_rounded,
+              size: 28,
+            ),
+          ),
       ],
       customScrollViewBuilder: (_, scrollPhysics, sliverAppBar) {
         return ValueListenableBuilder(

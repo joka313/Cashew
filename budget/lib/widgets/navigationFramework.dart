@@ -523,7 +523,10 @@ class PageNavigationFrameworkState extends State<PageNavigationFramework> {
                 routesToPopAfterDelete: RoutesToPopAfterDelete.None,
               ),
             ),
-            condition: [0, 1, 2, 14].contains(currentPage),
+            // On phones the add button is in the Home and Transactions
+            // headers instead, keeping the screen clear
+            condition:
+                getIsFullScreen(context) && [0, 1, 2, 14].contains(currentPage),
           ),
         ),
       ),
