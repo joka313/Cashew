@@ -8,6 +8,7 @@ import 'package:budget/pages/transactionsListPage.dart';
 import 'package:budget/pages/upcomingOverdueTransactionsPage.dart';
 import 'package:budget/struct/navBarIconsData.dart';
 import 'package:budget/struct/settings.dart';
+import 'package:budget/vietqr/vietqr_scan_page.dart';
 import 'package:budget/widgets/fadeIn.dart';
 import 'package:budget/widgets/framework/popupFramework.dart';
 import 'package:budget/widgets/navigationFramework.dart';
@@ -210,8 +211,8 @@ class BottomNavBarState extends State<BottomNavBar> {
         ),
       );
     }
-    // Android navbar
-    return Container(
+    // Android navbar (also used on the web)
+    Widget navigationBar = Container(
       decoration: BoxDecoration(
         boxShadow: boxShadowSharp(context),
       ),
@@ -282,6 +283,12 @@ class BottomNavBarState extends State<BottomNavBar> {
                 );
               },
             ),
+            // Space for the QR scan button drawn over the middle of the bar
+            NavigationDestination(
+              icon: SizedBox(width: _scanButtonSize, height: 24),
+              label: "",
+              tooltip: "",
+            ),
             CustomizableNavigationBarIcon(
               shortcutAppSettingKey: "customNavBarShortcut2",
               afterSet: () {
@@ -304,10 +311,77 @@ class BottomNavBarState extends State<BottomNavBar> {
               tooltip: "",
             ),
           ],
-          selectedIndex: navigationBarIndex,
+          // Bar slot 2 is the scan button, the tabs after it shift by one
+          selectedIndex: navigationBarIndex >= 2
+              ? navigationBarIndex + 1
+              : navigationBarIndex,
           onDestinationSelected: (value) {
-            onItemTapped(value);
+            if (value == 2) return;
+            onItemTapped(value > 2 ? value - 1 : value);
           },
+        ),
+      ),
+    );
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.topCenter,
+      children: [
+        navigationBar,
+        Positioned(
+          top: -_scanButtonRaise,
+          child: NavBarScanButton(),
+        ),
+      ],
+    );
+  }
+}
+
+const double _scanButtonSize = 60;
+// How far the scan button sticks out above the bar
+const double _scanButtonRaise = 14;
+
+// Round VietQR scan button in the middle of the bottom navigation bar
+class NavBarScanButton extends StatelessWidget {
+  const NavBarScanButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    bool isLight = Theme.of(context).brightness == Brightness.light;
+    Color background = isLight ? Color(0xFF1C1C1E) : Colors.white;
+    Color foreground = isLight ? Colors.white : Color(0xFF1C1C1E);
+    return Tooltip(
+      message: "Quét VietQR",
+      child: Container(
+        width: _scanButtonSize,
+        height: _scanButtonSize,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isLight ? 0.25 : 0.4),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Material(
+          color: background,
+          shape: CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () {
+              Feedback.forTap(context);
+              FocusScope.of(context).unfocus();
+              openVietQrScanFlow(context);
+            },
+            child: Icon(
+              appStateSettings["outlinedIcons"]
+                  ? Icons.qr_code_scanner_outlined
+                  : Icons.qr_code_scanner_rounded,
+              color: foreground,
+              size: 28,
+            ),
+          ),
         ),
       ),
     );
