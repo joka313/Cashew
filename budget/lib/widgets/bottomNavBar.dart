@@ -212,17 +212,16 @@ class BottomNavBarState extends State<BottomNavBar> {
       );
     }
     // Android navbar (also used on the web)
+    Color barColor = getBottomNavbarBackgroundColor(
+      colorScheme: Theme.of(context).colorScheme,
+      brightness: Theme.of(context).brightness,
+      lightDarkAccent: getColor(context, "lightDarkAccent"),
+    );
+    // The bar background (with the notch and shadow) is painted below
     Widget navigationBar = Container(
-      decoration: BoxDecoration(
-        boxShadow: boxShadowSharp(context),
-      ),
       child: NavigationBarTheme(
         data: NavigationBarThemeData(
-          backgroundColor: getBottomNavbarBackgroundColor(
-            colorScheme: Theme.of(context).colorScheme,
-            brightness: Theme.of(context).brightness,
-            lightDarkAccent: getColor(context, "lightDarkAccent"),
-          ),
+          backgroundColor: Colors.transparent,
           surfaceTintColor: Colors.transparent,
           indicatorColor: appStateSettings["materialYou"]
               ? dynamicPastel(context, Theme.of(context).colorScheme.primary,
@@ -316,26 +315,99 @@ class BottomNavBarState extends State<BottomNavBar> {
         ),
       ),
     );
+    bool isDark = Theme.of(context).brightness == Brightness.dark;
+    // The widget is taller than the bar by the button overhang so the whole
+    // button can be tapped
     return Stack(
-      clipBehavior: Clip.none,
-      alignment: Alignment.topCenter,
       children: [
-        navigationBar,
+        Padding(
+          padding: const EdgeInsetsDirectional.only(top: _scanButtonOverhang),
+          child: CustomPaint(
+            painter: _NotchedBarPainter(
+              color: barColor,
+              borderColor: isDark
+                  ? Colors.white.withOpacity(0.10)
+                  : Colors.black.withOpacity(0.06),
+              shadowColor: Colors.black.withOpacity(isDark ? 0.6 : 0.25),
+            ),
+            child: navigationBar,
+          ),
+        ),
         Positioned(
-          top: -_scanButtonRaise,
-          child: NavBarScanButton(),
+          top: 0,
+          left: 0,
+          right: 0,
+          child: Center(child: NavBarScanButton()),
         ),
       ],
     );
   }
 }
 
-const double _scanButtonSize = 52;
+const double _scanButtonSize = 56;
 // How far the scan button sticks out above the bar
-const double _scanButtonRaise = 10;
+const double _scanButtonOverhang = 20;
+// Space between the button and the curved notch
+const double _notchGap = 6;
+// How far the notch curve reaches out on each side of the button
+const double _notchShoulder = 30;
 
-// VietQR scan button in the middle of the bottom navigation bar, styled like
-// the add transaction button (same colors, corner radius and shadow)
+// Bar background with a smooth curved notch cradling the scan button
+class _NotchedBarPainter extends CustomPainter {
+  _NotchedBarPainter({
+    required this.color,
+    required this.borderColor,
+    required this.shadowColor,
+  });
+  final Color color;
+  final Color borderColor;
+  final Color shadowColor;
+
+  Path topEdge(Size size) {
+    double cx = size.width / 2;
+    double radius = _scanButtonSize / 2 + _notchGap;
+    double halfWidth = radius + _notchShoulder;
+    // Button center sits this far below the bar's top edge
+    double buttonCenter = _scanButtonSize / 2 - _scanButtonOverhang;
+    double depth = buttonCenter + radius;
+    return Path()
+      ..moveTo(0, 0)
+      ..lineTo(cx - halfWidth, 0)
+      // Gentle shoulder leaving the flat edge, then a round bottom that
+      // follows the button
+      ..cubicTo(cx - radius - _notchShoulder * 0.15, 0, cx - radius * 0.95,
+          depth, cx, depth)
+      ..cubicTo(cx + radius * 0.95, depth, cx + radius + _notchShoulder * 0.15,
+          0, cx + halfWidth, 0)
+      ..lineTo(size.width, 0);
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    Path background = topEdge(size)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawShadow(background, shadowColor, 6, false);
+    canvas.drawPath(background, Paint()..color = color);
+    canvas.drawPath(
+      topEdge(size),
+      Paint()
+        ..color = borderColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_NotchedBarPainter oldDelegate) =>
+      oldDelegate.color != color ||
+      oldDelegate.borderColor != borderColor ||
+      oldDelegate.shadowColor != shadowColor;
+}
+
+// Round VietQR scan button in the notch of the bottom navigation bar, in the
+// add transaction button's colors
 class NavBarScanButton extends StatelessWidget {
   const NavBarScanButton({super.key});
 
@@ -348,7 +420,7 @@ class NavBarScanButton extends StatelessWidget {
         width: _scanButtonSize,
         height: _scanButtonSize,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(
@@ -362,9 +434,7 @@ class NavBarScanButton extends StatelessWidget {
         ),
         child: Material(
           color: colorScheme.secondary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
+          shape: CircleBorder(),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: () {
