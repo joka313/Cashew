@@ -489,130 +489,135 @@ class _SignInWithGoogleFlyInState extends State<SignInWithGoogleFlyIn> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsetsDirectional.symmetric(horizontal: 22),
-      child: SlideFadeTransition(
-        animate: true,
-        animationDuration: Duration(milliseconds: 1700),
-        curve: ElasticOutCurve(0.8),
-        delayStart: Duration(milliseconds: 1900),
-        offset: -0.5,
-        child: AnimatedExpanded(
-          expand: shouldExpand,
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Align(
-                alignment: AlignmentDirectional.topEnd,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: 400),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius:
-                          BorderRadiusDirectional.all(Radius.circular(13)),
-                      color: getColor(context, "lightDarkAccentHeavyLight"),
-                      boxShadow: boxShadowCheck(boxShadowSharp(context)),
-                    ),
-                    child: Tappable(
-                      onTap: () async {
-                        await signInGoogle();
-                        setState(() {
-                          hide = true;
-                        });
-                      },
-                      borderRadius: 13,
-                      color: dynamicPastel(
-                        context,
-                        Theme.of(context).colorScheme.secondaryContainer,
-                        amount: 0.6,
+    // Shown in the middle of the screen (taps around it still reach the app)
+    return Center(
+      child: Padding(
+        padding: const EdgeInsetsDirectional.symmetric(horizontal: 22),
+        child: SlideFadeTransition(
+          animate: true,
+          animationDuration: Duration(milliseconds: 1700),
+          curve: ElasticOutCurve(0.8),
+          delayStart: Duration(milliseconds: 1900),
+          offset: -0.5,
+          child: AnimatedExpanded(
+            expand: shouldExpand,
+            child: SafeArea(
+              child: Padding(
+                padding: EdgeInsets.zero,
+                child: Align(
+                  alignment: Alignment.center,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: 400),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius:
+                            BorderRadiusDirectional.all(Radius.circular(13)),
+                        color: getColor(context, "lightDarkAccentHeavyLight"),
+                        boxShadow: boxShadowCheck(boxShadowSharp(context)),
                       ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: Padding(
-                              padding: const EdgeInsetsDirectional.only(
-                                start: 25,
-                                end: 15,
-                                top: 15,
-                                bottom: 15,
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        MoreIcons.google,
-                                        size: 25,
-                                      ),
-                                      SizedBox(width: 10),
-                                      TextFont(
-                                        text: "Chưa đồng bộ Google Drive",
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18,
-                                      ),
-                                    ],
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsetsDirectional.only(
-                                        start: 18.0),
-                                    child: IconButtonScaled(
-                                      iconData:
-                                          appStateSettings["outlinedIcons"]
-                                              ? Icons.close_outlined
-                                              : Icons.close_rounded,
-                                      iconSize: 18,
-                                      scale: 1.5,
-                                      onTap: () async {
-                                        setState(() {
-                                          hide = true;
-                                        });
-                                      },
+                      child: Tappable(
+                        onTap: () async {
+                          // Same as the button: sign in, sync and back up
+                          await signInAndSync(context, next: () {});
+                          // Stays visible if signing in failed
+                          setState(() {});
+                        },
+                        borderRadius: 13,
+                        color: dynamicPastel(
+                          context,
+                          Theme.of(context).colorScheme.secondaryContainer,
+                          amount: 0.6,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Padding(
+                                padding: const EdgeInsetsDirectional.only(
+                                  start: 25,
+                                  end: 15,
+                                  top: 15,
+                                  bottom: 15,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          MoreIcons.google,
+                                          size: 25,
+                                        ),
+                                        SizedBox(width: 10),
+                                        TextFont(
+                                          text: "Chưa đồng bộ Google Drive",
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 18,
+                                        ),
+                                      ],
                                     ),
-                                  ),
-                                ],
+                                    Padding(
+                                      padding: const EdgeInsetsDirectional.only(
+                                          start: 18.0),
+                                      child: IconButtonScaled(
+                                        iconData:
+                                            appStateSettings["outlinedIcons"]
+                                                ? Icons.close_outlined
+                                                : Icons.close_rounded,
+                                        iconSize: 18,
+                                        scale: 1.5,
+                                        onTap: () async {
+                                          setState(() {
+                                            hide = true;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                          HorizontalBreak(
-                            padding: EdgeInsetsDirectional.zero,
-                            color: dynamicPastel(
-                              context,
-                              Theme.of(context).colorScheme.secondaryContainer,
-                              amount: 0.1,
-                              inverse: true,
+                            HorizontalBreak(
+                              padding: EdgeInsetsDirectional.zero,
+                              color: dynamicPastel(
+                                context,
+                                Theme.of(context)
+                                    .colorScheme
+                                    .secondaryContainer,
+                                amount: 0.1,
+                                inverse: true,
+                              ),
                             ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsetsDirectional.symmetric(
-                                horizontal: 22, vertical: 12),
-                            child: Button(
-                              label: "Đồng bộ ngay",
-                              onTap: () async {
-                                // Signs in, syncs and backs up right away
-                                await signInAndSync(context, next: () {});
-                                setState(() {});
-                              },
-                              color: Theme.of(context).colorScheme.primary,
-                              textColor:
-                                  Theme.of(context).colorScheme.onPrimary,
-                              borderRadius: 5,
+                            Padding(
+                              padding: const EdgeInsetsDirectional.symmetric(
+                                  horizontal: 22, vertical: 12),
+                              child: Button(
+                                label: "Đồng bộ ngay",
+                                onTap: () async {
+                                  // Signs in, syncs and backs up right away
+                                  await signInAndSync(context, next: () {});
+                                  setState(() {});
+                                },
+                                color: Theme.of(context).colorScheme.primary,
+                                textColor:
+                                    Theme.of(context).colorScheme.onPrimary,
+                                borderRadius: 5,
+                              ),
                             ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsetsDirectional.only(
-                                start: 22, end: 22, bottom: 22),
-                            child: TextFont(
-                              text:
-                                  "Dữ liệu đang chỉ nằm trên máy này. Bấm để đăng nhập Google, sau đó mọi thay đổi sẽ tự lưu lên Google Drive. " +
-                                      lastSavedOnlineLabel(),
-                              maxLines: 10,
-                              fontSize: 15,
+                            Padding(
+                              padding: const EdgeInsetsDirectional.only(
+                                  start: 22, end: 22, bottom: 22),
+                              child: TextFont(
+                                text:
+                                    "Dữ liệu đang chỉ nằm trên máy này. Bấm để đăng nhập Google, sau đó mọi thay đổi sẽ tự lưu lên Google Drive. " +
+                                        lastSavedOnlineLabel(),
+                                maxLines: 10,
+                                fontSize: 15,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
