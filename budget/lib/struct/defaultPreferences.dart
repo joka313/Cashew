@@ -167,6 +167,8 @@ Future<Map<String, dynamic>> getDefaultPreferences() async {
     "pieChartIncomeAndExpenseOnly": true,
     "pieChartAllWallets": true,
     "netWorthAllWallets": true,
+    // Net worth adds money lent out and subtracts money borrowed
+    "netWorthIncludeLoans": true,
     "walletsListCurrencyBreakdown": false,
     "allSpendingSummaryAllWallets": true,
     "showPastSpendingTrajectory": false,

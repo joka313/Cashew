@@ -14,6 +14,7 @@ import 'package:budget/widgets/navigationFramework.dart';
 import 'package:budget/widgets/openBottomSheet.dart';
 import 'package:budget/widgets/outlinedButtonStacked.dart';
 import 'package:budget/widgets/periodCyclePicker.dart';
+import 'package:budget/widgets/settingsContainers.dart';
 import 'package:budget/widgets/transactionsAmountBox.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -49,7 +50,9 @@ class HomePageNetWorth extends StatelessWidget {
                           await openNetWorthSettings(context);
                           homePageStateKey.currentState?.refreshState();
                         },
-                        label: "net-worth".tr(),
+                        label: appStateSettings["netWorthIncludeLoans"] == false
+                            ? "net-worth".tr()
+                            : "Tổng tài sản",
                         getTextColor: appStateSettings["netTotalsColorful"] !=
                                 true
                             ? null
@@ -86,6 +89,15 @@ class HomePageNetWorth extends StatelessWidget {
                           searchFilters:
                               SearchFilters(walletPks: walletPks ?? []),
                         ),
+                        totalWithCountStream2:
+                            appStateSettings["netWorthIncludeLoans"] == false
+                                ? null
+                                : database.watchNetWorthLoansAdjustment(
+                                    allWallets:
+                                        Provider.of<AllWallets>(context),
+                                    walletPks: walletPks,
+                                    cycleSettingsExtension: "NetWorth",
+                                  ),
                         // getTextColor: (amount) => amount == 0
                         //     ? getColor(context, "black")
                         //     : amount > 0
@@ -262,10 +274,27 @@ Future openNetWorthSettings(BuildContext context) {
           (getPlatform(ignoreEmulation: true) == PlatformOS.isAndroid
               ? " " + "and-applies-to-widget".tr()
               : ""),
-      child: WalletPickerPeriodCycle(
-        allWalletsSettingKey: "netWorthAllWallets",
-        cycleSettingsExtension: "NetWorth",
-        homePageWidgetDisplay: HomePageWidgetDisplay.NetWorth,
+      child: Column(
+        children: [
+          SettingsContainerSwitch(
+            title: "Tính cả cho vay / đi vay",
+            description:
+                "Cộng các khoản đang cho vay, trừ các khoản đang đi vay (tổng tài sản)",
+            icon: appStateSettings["outlinedIcons"]
+                ? Icons.handshake_outlined
+                : Icons.handshake_rounded,
+            initialValue: appStateSettings["netWorthIncludeLoans"] != false,
+            onSwitched: (value) async {
+              await updateSettings("netWorthIncludeLoans", value,
+                  updateGlobalState: false);
+            },
+          ),
+          WalletPickerPeriodCycle(
+            allWalletsSettingKey: "netWorthAllWallets",
+            cycleSettingsExtension: "NetWorth",
+            homePageWidgetDisplay: HomePageWidgetDisplay.NetWorth,
+          ),
+        ],
       ),
     ),
   );

@@ -6967,14 +6967,24 @@ class FinanceDatabase extends _$FinanceDatabase {
     // selectedTab == 1 : long-term
     // Only apply selectedTab when searching
     required int? selectedTab,
+    // Null or empty includes every wallet
+    List<String>? walletPks,
   }) {
     List<Stream<TotalWithCount?>> mergedStreams = [];
     for (TransactionWallet wallet in allWallets.list) {
-      // Add the total offsets of objective amounts
-      Expression<double> totalAmtObjective = objectives.amount.sum();
-      Expression<bool> objectiveIncome = objectives.income;
+      if (walletPks != null &&
+          walletPks.isNotEmpty &&
+          walletPks.contains(wallet.walletPk) == false) continue;
+      // Add the total offsets of objective amounts.
+      // Lent (income) and borrowed loans are summed separately: reading the
+      // income column next to a plain SUM took the sign of an arbitrary row
+      // when a wallet had both kinds of long-term loans.
+      Expression<double> totalAmtLent =
+          objectives.amount.abs().sum(filter: objectives.income.equals(true));
+      Expression<double> totalAmtBorrowed =
+          objectives.amount.abs().sum(filter: objectives.income.equals(false));
       final queryTotalObjectiveAmountOffset = selectOnly(objectives)
-        ..addColumns([totalAmtObjective, objectiveIncome])
+        ..addColumns([totalAmtLent, totalAmtBorrowed])
         ..where(objectives.archived.equals(false) &
             objectives.type.equals(ObjectiveType.loan.index) &
             objectives.walletFk.equals(wallet.walletPk) &
@@ -6998,13 +7008,51 @@ class FinanceDatabase extends _$FinanceDatabase {
       mergedStreams.add(queryTotalObjectiveAmountOffset.map((row) {
         // print(row.rawData.data);
         return TotalWithCount(
-            total: (row.read(totalAmtObjective) ?? 0).abs() *
-                ((row.read(objectiveIncome) ?? true) ? -1 : 1) *
+            total: ((row.read(totalAmtBorrowed) ?? 0) -
+                    (row.read(totalAmtLent) ?? 0)) *
                 (amountRatioToPrimaryCurrency(allWallets, wallet.currency)),
             count: 0);
       }).watchSingle());
     }
     return totalTotalWithCountStream(mergedStreams);
+  }
+
+  // Net worth as total assets: account balances plus what others owe you
+  // minus what you owe. Loans already moved the account balances (lending
+  // took money out, borrowing put money in), so the outstanding loan total
+  // shown on the Loans page (negative when others owe you) is subtracted.
+  Stream<TotalWithCount?> watchNetWorthLoansAdjustment({
+    required AllWallets allWallets,
+    required List<String>? walletPks,
+    required String cycleSettingsExtension,
+  }) {
+    Stream<TotalWithCount?> loanTransactions = watchTotalWithCountOfCreditDebt(
+      allWallets: allWallets,
+      isCredit: null,
+      selectedTab: null,
+      followCustomPeriodCycle: true,
+      cycleSettingsExtension: cycleSettingsExtension,
+      searchFilters: SearchFilters(walletPks: walletPks ?? []),
+    );
+    // Long term loan amount offsets have no date, only count them all time
+    bool isAllTime = (appStateSettings[
+                "selectedPeriodCycleType" + cycleSettingsExtension] ??
+            0) ==
+        CycleType.allTime.index;
+    List<Stream<TotalWithCount?>> streams = [
+      loanTransactions,
+      if (isAllTime)
+        watchTotalWithCountOfCreditDebtLongTermLoansOffset(
+          allWallets: allWallets,
+          isCredit: null,
+          selectedTab: null,
+          walletPks: walletPks,
+        ),
+    ];
+    return StreamZip(streams).map((totals) => TotalWithCount(
+        total: -totals.fold<double>(
+            0, (sum, total) => sum + (total?.total ?? 0)),
+        count: 0));
   }
 
   Stream<List<Transaction>> watchAllCreditDebtTransactions(
