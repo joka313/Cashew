@@ -14,6 +14,7 @@ import 'package:budget/pages/transactionsListPage.dart';
 import 'package:budget/struct/databaseGlobal.dart';
 import 'package:budget/struct/navBarIconsData.dart';
 import 'package:budget/struct/settings.dart';
+import 'package:budget/struct/spreadTransaction.dart';
 import 'package:budget/struct/upcomingTransactionsFunctions.dart';
 import 'package:budget/struct/uploadAttachment.dart';
 import 'package:budget/widgets/accountAndBackup.dart';
@@ -157,6 +158,8 @@ class _AddTransactionPageState extends State<AddTransactionPage>
   bool selectedPaid = true;
   bool selectedBudgetIsShared = false;
   String selectedWalletPk = appStateSettings["selectedWalletPk"];
+  // Spread one payment evenly over this many months (new default ones only)
+  int spreadMonths = 1;
   bool notesInputFocused = false;
   bool showMoreOptions = false;
   List<String> selectedExcludedBudgetPks = [];
@@ -471,6 +474,36 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       }
 
       Transaction createdTransaction = await createTransaction();
+
+      // One payment spread over months: insert one paid part per month
+      if (widget.transaction == null &&
+          selectedType == null &&
+          spreadMonths > 1) {
+        List<Transaction> parts = spreadTransactionOverMonths(
+          createdTransaction,
+          months: spreadMonths,
+          decimals: Provider.of<AllWallets>(context, listen: false)
+                  .indexedByPk[selectedWalletPk]
+                  ?.decimals ??
+              2,
+          label: (selectedTitle ?? "").trim() != ""
+              ? selectedTitle!
+              : (selectedCategory?.name ?? ""),
+        );
+        Transaction? firstPart;
+        for (Transaction part in parts) {
+          final int? rowId =
+              await database.createOrUpdateTransaction(insert: true, part);
+          if (rowId != null && firstPart == null) {
+            firstPart = await database.getTransactionFromRowId(rowId);
+          }
+        }
+        if (firstPart != null) {
+          widget.onTransactionAdded?.call(firstPart);
+          flashTransaction(firstPart.transactionPk);
+        }
+        return true;
+      }
 
       if (widget.transaction != null) {
         // Only ask if changes were made that will affect other balance correction
@@ -1200,6 +1233,74 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                         return false;
                       }
                     },
+                  ),
+                ),
+              ),
+              AnimatedExpanded(
+                expand: selectedType == null && widget.transaction == null,
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.only(
+                      start: 22, end: 22, top: 8, bottom: 4),
+                  child: Tappable(
+                    color: spreadMonths > 1
+                        ? Theme.of(context).colorScheme.secondaryContainer
+                        : getColor(context, "lightDarkAccentHeavyLight"),
+                    borderRadius: 12,
+                    onTap: () {
+                      openBottomSheet(
+                        context,
+                        PopupFramework(
+                          title: "Chia đều cho bao nhiêu tháng?",
+                          subtitle:
+                              "Mỗi tháng ghi một phần bằng nhau. Số dư tài khoản vẫn trừ đủ ngay, còn chi tiêu từng tháng chỉ tính một phần.",
+                          child: SelectAmountValue(
+                            enableDecimal: false,
+                            // Start empty so typing "7" gives 7, not 17
+                            amountPassed: spreadMonths > 1
+                                ? spreadMonths.toString()
+                                : "",
+                            setSelectedAmount: (amount, _) {
+                              setState(() {
+                                spreadMonths =
+                                    (amount as num).toInt().clamp(1, 120);
+                              });
+                            },
+                            next: () async {
+                              popRoute(context);
+                            },
+                            nextLabel: "Xong",
+                          ),
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.symmetric(
+                          horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          Icon(
+                            appStateSettings["outlinedIcons"]
+                                ? Icons.calendar_view_month_outlined
+                                : Icons.calendar_view_month_rounded,
+                            size: 22,
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: TextFont(
+                              text: "Chia đều theo tháng",
+                              fontSize: 16,
+                            ),
+                          ),
+                          TextFont(
+                            text: spreadMonths > 1
+                                ? spreadMonths.toString() + " tháng"
+                                : "Không",
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
