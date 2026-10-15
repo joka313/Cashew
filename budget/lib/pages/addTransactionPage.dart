@@ -106,6 +106,7 @@ class AddTransactionPage extends StatefulWidget {
     this.selectedNotes,
     this.startInitialAddTransactionSequence = true,
     this.skipTitlePrompt = false,
+    this.skipDatePrompt = false,
     this.transferBalancePopup = false,
     this.onTransactionAdded,
     required this.routesToPopAfterDelete,
@@ -129,6 +130,8 @@ class AddTransactionPage extends StatefulWidget {
   final bool startInitialAddTransactionSequence;
   // Skip the date and title steps (e.g. a VietQR recipient paid before)
   final bool skipTitlePrompt;
+  // Keep today's date without asking (e.g. a VietQR payment happens now)
+  final bool skipDatePrompt;
   final bool transferBalancePopup;
   // Called after the transaction was saved to the database
   final void Function(Transaction transaction)? onTransactionAdded;
@@ -829,13 +832,15 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         if (appStateSettings["askForTransactionTitle"]) {
           // Step 1: pick the date (keeps the time), step 2: enter the title
           DateTime initialDate = widget.selectedDate ?? selectedDate;
-          DateTime? pickedDate = await showCustomDatePicker(
-            context,
-            initialDate,
-            confirmText: appStateSettings["materialYou"]
-                ? "next-date-time".tr()
-                : "next-date-time".tr().allCaps,
-          );
+          DateTime? pickedDate = widget.skipDatePrompt
+              ? null
+              : await showCustomDatePicker(
+                  context,
+                  initialDate,
+                  confirmText: appStateSettings["materialYou"]
+                      ? "next-date-time".tr()
+                      : "next-date-time".tr().allCaps,
+                );
           if (!mounted) return;
           if (pickedDate != null) {
             setState(() {

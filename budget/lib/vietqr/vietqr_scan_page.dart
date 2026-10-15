@@ -46,6 +46,8 @@ Future openVietQrScanFlow(BuildContext context) async {
       selectedSubCategory: remembered?.subCategory,
       selectedWallet: remembered?.wallet,
       skipTitlePrompt: remembered != null,
+      // A QR payment happens now, no need to ask for the date
+      skipDatePrompt: true,
       selectedNotes: vietQrNote(data),
       onTransactionAdded: (Transaction transaction) {
         savedTransaction = transaction;
