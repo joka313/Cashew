@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:budget/colors.dart';
 import 'package:budget/database/generatePreviewData.dart';
 import 'package:budget/database/tables.dart';
-import 'package:budget/firebase_options.dart';
 import 'package:budget/functions.dart';
 import 'package:budget/main.dart';
 import 'package:budget/pages/aboutPage.dart';
@@ -131,7 +130,9 @@ Future<bool> signInGoogle(
       ];
       googleSignIn = getPlatform() == PlatformOS.isIOS
           ? signIn.GoogleSignIn(
-              clientId: DefaultFirebaseOptions.currentPlatform.iosClientId,
+              // iOS client id of the original project (was in firebase_options)
+              clientId:
+                  "267621253497-ih94g1srq37gun4mdmvadgl3ev588vpf.apps.googleusercontent.com",
               scopes: scopes)
           : signIn.GoogleSignIn.standard(scopes: scopes);
       // googleSignIn?.currentUser?.clearAuthCache();
