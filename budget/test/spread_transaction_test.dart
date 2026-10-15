@@ -132,4 +132,64 @@ void main() {
           0);
     });
   });
+
+  group('spread groups', () {
+    setUp(() async {
+      database = FinanceDatabase(NativeDatabase.memory());
+      await database.into(database.wallets).insert(WalletsCompanion.insert(
+          walletPk: Value("0"),
+          name: "Bank",
+          order: 0,
+          currency: Value("vnd"),
+          decimals: Value(0)));
+      await database.into(database.categories).insert(
+          CategoriesCompanion.insert(
+              categoryPk: Value("food"), name: "Food", order: 0));
+    });
+    tearDown(() => database.close());
+
+    Future<List<Transaction>> insertSpread(DateTime start, int months) async {
+      List<Transaction> inserted = [];
+      for (Transaction part in spreadTransactionOverMonths(
+          gym.copyWith(dateCreated: start),
+          months: months,
+          decimals: 0,
+          label: "Gym")) {
+        int? rowId =
+            await database.createOrUpdateTransaction(insert: true, part);
+        inserted.add(await database.getTransactionFromRowId(rowId!));
+      }
+      return inserted;
+    }
+
+    test('parses part names', () {
+      SpreadPartName? part = parseSpreadPartName("Gym (3/7)");
+      expect([part?.base, part?.index, part?.count], ["Gym", 3, 7]);
+      expect(parseSpreadPartName("(1/3)")?.base, "");
+      expect(parseSpreadPartName("Gym"), null);
+      expect(parseSpreadPartName("Gym (8/7)"), null);
+      expect(part!.withIndex(5, base: "Gym Elite"), "Gym Elite (5/7)");
+    });
+
+    test('finds every part from any part', () async {
+      List<Transaction> parts = await insertSpread(DateTime(2026, 1, 31), 7);
+      List<Transaction> group = await findSpreadGroup(parts[4]);
+      expect(group.map((t) => t.name).toList(),
+          List.generate(7, (i) => "Gym (${i + 1}/7)"));
+    });
+
+    test('a renewal with the same title is a separate group', () async {
+      List<Transaction> first = await insertSpread(DateTime(2026, 1, 10), 7);
+      List<Transaction> renewal = await insertSpread(DateTime(2026, 5, 10), 7);
+      List<Transaction> group = await findSpreadGroup(renewal[0]);
+      expect(group.map((t) => t.transactionPk).toSet(),
+          renewal.map((t) => t.transactionPk).toSet());
+      expect((await findSpreadGroup(first[6])).length, 7);
+    });
+
+    test('a normal transaction is not a group', () async {
+      await insertSpread(DateTime(2026, 1, 10), 3);
+      expect(await findSpreadGroup(gym.copyWith(name: "Gym")), isEmpty);
+    });
+  });
 }

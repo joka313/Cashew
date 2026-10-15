@@ -592,11 +592,21 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         }
       }
 
+      // Found before saving, the edit may change what identifies the group
+      List<Transaction> spreadGroup = widget.transaction == null
+          ? []
+          : await findSpreadGroup(widget.transaction!);
+
       final int? rowId = await database.createOrUpdateTransaction(
         insert: widget.transaction == null,
         createdTransaction,
         originalTransaction: widget.transaction,
       );
+
+      if (spreadGroup.length > 1) {
+        await offerToApplyEditToSpreadGroup(
+            context, widget.transaction!, createdTransaction, spreadGroup);
+      }
 
       if (rowId != null) {
         final Transaction transactionJustAdded =
@@ -3568,6 +3578,61 @@ class HorizontalBreak extends StatelessWidget {
   }
 }
 
+// Editing one part of a "spread over months" payment: apply the title,
+// category, account, note and amount to the other parts too. Each part
+// keeps its own date and part number.
+Future<void> offerToApplyEditToSpreadGroup(BuildContext context,
+    Transaction original, Transaction edited, List<Transaction> group) async {
+  SpreadPartName? originalPart = parseSpreadPartName(original.name);
+  if (originalPart == null) return;
+  String newBase = parseSpreadPartName(edited.name)?.base ?? edited.name;
+  bool changed = newBase.trim() != originalPart.base.trim() ||
+      edited.categoryFk != original.categoryFk ||
+      edited.subCategoryFk != original.subCategoryFk ||
+      edited.walletFk != original.walletFk ||
+      edited.note != original.note ||
+      edited.amount != original.amount ||
+      edited.income != original.income;
+  if (!changed) return;
+  dynamic apply = await openPopup(
+    context,
+    icon: appStateSettings["outlinedIcons"]
+        ? Icons.calendar_view_month_outlined
+        : Icons.calendar_view_month_rounded,
+    title: "Áp dụng cho cả nhóm?",
+    description: "Giao dịch này là 1 trong " +
+        group.length.toString() +
+        " phần chia đều theo tháng. Áp dụng tiêu đề, danh mục, tài khoản, ghi chú và số tiền mới cho cả nhóm? Ngày của từng tháng giữ nguyên.",
+    onCancelLabel: "Chỉ phần này",
+    onCancel: () {
+      popRoute(context, false);
+    },
+    onSubmitLabel: "Cả nhóm",
+    onSubmit: () {
+      popRoute(context, true);
+    },
+  );
+  if (apply != true) return;
+  for (Transaction part in group) {
+    if (part.transactionPk == original.transactionPk) continue;
+    SpreadPartName? partName = parseSpreadPartName(part.name);
+    if (partName == null) continue;
+    await database.createOrUpdateTransaction(
+      insert: false,
+      part.copyWith(
+        name: partName.withIndex(partName.index, base: newBase),
+        categoryFk: edited.categoryFk,
+        subCategoryFk: Value(edited.subCategoryFk),
+        walletFk: edited.walletFk,
+        note: edited.note,
+        amount: edited.amount,
+        income: edited.income,
+      ),
+      originalTransaction: part,
+    );
+  }
+}
+
 void deleteTransactionPopup(
   BuildContext context, {
   required Transaction transaction,
@@ -3582,6 +3647,32 @@ void deleteTransactionPopup(
     subtitle: transactionName,
   );
   if (action == DeletePopupAction.Delete) {
+    // A part of a "spread over months" payment: this part or all of them
+    List<Transaction> spreadGroup = await findSpreadGroup(transaction);
+    bool deleteSpreadGroup = false;
+    if (spreadGroup.length > 1) {
+      dynamic choice = await openPopup(
+        context,
+        icon: appStateSettings["outlinedIcons"]
+            ? Icons.calendar_view_month_outlined
+            : Icons.calendar_view_month_rounded,
+        title: "Xoá cả nhóm chia tháng?",
+        subtitle: transactionName,
+        description: "Giao dịch này là 1 trong " +
+            spreadGroup.length.toString() +
+            " phần chia đều theo tháng.",
+        onCancelLabel: "Chỉ phần này",
+        onCancel: () {
+          popRoute(context, false);
+        },
+        onSubmitLabel: "Cả " + spreadGroup.length.toString() + " phần",
+        onSubmit: () {
+          popRoute(context, true);
+        },
+      );
+      if (choice == null) return;
+      deleteSpreadGroup = choice == true;
+    }
     await checkToDeleteCloselyRelatedBalanceCorrectionTransaction(context,
         transaction: transaction);
     if (routesToPopAfterDelete == RoutesToPopAfterDelete.All) {
@@ -3590,12 +3681,23 @@ void deleteTransactionPopup(
       popRoute(context);
     }
     openLoadingPopupTryCatch(() async {
-      await database.deleteTransaction(transaction.transactionPk);
+      if (deleteSpreadGroup) {
+        for (Transaction part in spreadGroup) {
+          await database.deleteTransaction(part.transactionPk);
+        }
+      } else {
+        await database.deleteTransaction(transaction.transactionPk);
+      }
       openSnackbar(
         SnackbarMessage(
           title: "deleted-transaction".tr(),
           icon: Icons.delete,
-          description: transactionName,
+          description: deleteSpreadGroup
+              ? transactionName.toString() +
+                  " (" +
+                  spreadGroup.length.toString() +
+                  " phần)"
+              : transactionName,
         ),
       );
     });
