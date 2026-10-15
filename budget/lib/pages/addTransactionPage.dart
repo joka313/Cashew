@@ -820,11 +820,29 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         await premiumPopupAddTransaction(context);
         if (widget.startInitialAddTransactionSequence == false) return;
         if (appStateSettings["askForTransactionTitle"]) {
+          // Step 1: pick the date (keeps the time), step 2: enter the title
+          DateTime initialDate = widget.selectedDate ?? selectedDate;
+          DateTime? pickedDate = await showCustomDatePicker(
+            context,
+            initialDate,
+            confirmText: appStateSettings["materialYou"]
+                ? "next-date-time".tr()
+                : "next-date-time".tr().allCaps,
+          );
+          if (!mounted) return;
+          if (pickedDate != null) {
+            setState(() {
+              selectedDate = DateTime(pickedDate.year, pickedDate.month,
+                  pickedDate.day, initialDate.hour, initialDate.minute);
+            });
+          }
           openBottomSheet(
             context,
             // Only allow full snap when entering a title
             popupWithKeyboard: true,
             SelectTitle(
+              // The date was picked in the step before
+              showDateSelection: false,
               selectedTitle: selectedTitle,
               setSelectedNote: setSelectedNoteController,
               setSelectedTitle: setSelectedTitleController,
@@ -2543,6 +2561,7 @@ class SelectTitle extends StatefulWidget {
     required this.setSelectedDateTime,
     this.selectedTitle,
     this.selectedDate,
+    this.showDateSelection = true,
     required this.noteInputController,
     required this.setSelectedNoteController,
     this.next,
@@ -2556,6 +2575,7 @@ class SelectTitle extends StatefulWidget {
   final Function(DateTime) setSelectedDateTime;
   final String? selectedTitle;
   final DateTime? selectedDate;
+  final bool showDateSelection;
   final TextEditingController noteInputController;
   final dynamic Function(String, {bool setInput}) setSelectedNoteController;
   final VoidCallback? next;
@@ -2639,7 +2659,8 @@ class _SelectTitleState extends State<SelectTitle> {
               getIsFullScreen(context)
           ? null
           : "enter-title".tr(),
-      outsideExtraWidget: customDateTimeSelected
+      outsideExtraWidget: customDateTimeSelected ||
+              widget.showDateSelection == false
           ? null
           : OutsideExtraWidgetIconButton(
               iconData: appStateSettings["outlinedIcons"]
