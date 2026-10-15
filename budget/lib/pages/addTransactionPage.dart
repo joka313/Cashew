@@ -1061,6 +1061,34 @@ class _AddTransactionPageState extends State<AddTransactionPage>
     }
   }
 
+  // "Spread over months" chip: one payment saved as equal monthly parts
+  Future<void> openSpreadMonthsPicker() async {
+    await openBottomSheet(
+      context,
+      PopupFramework(
+        title: "Chia đều cho bao nhiêu tháng?",
+        subtitle:
+            "Mỗi tháng ghi một phần bằng nhau. Số dư tài khoản vẫn trừ đủ ngay, còn chi tiêu từng tháng chỉ tính một phần.",
+        child: SelectAmountValue(
+          enableDecimal: false,
+          // Start empty so typing "7" gives 7, not 17
+          amountPassed: spreadMonths > 1 ? spreadMonths.toString() : "",
+          setSelectedAmount: (amount, _) {
+            setState(() {
+              spreadMonths = (amount as num).toInt().clamp(1, 120);
+            });
+          },
+          next: () async {
+            popRoute(context);
+          },
+          nextLabel: "Xong",
+        ),
+      ),
+    );
+    // Spreading is a variant of a default transaction
+    if (spreadMonths > 1) setSelectedType("Default");
+  }
+
   void openSelectSpecialTransactionTypeInfo() {
     openBottomSheet(
       context,
@@ -1188,10 +1216,33 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                         onPressed: openSelectSpecialTransactionTypeInfo,
                       ),
                     ),
-                    items:
-                        getTransactionSpecialTypesToShowGivenInitialTypeWhenAddingTransaction(
-                            widget.selectedType, isAddedToLoanObjective),
+                    items: [
+                      for (dynamic item
+                          in getTransactionSpecialTypesToShowGivenInitialTypeWhenAddingTransaction(
+                              widget.selectedType, isAddedToLoanObjective))
+                        // Repetitive, Lent and Borrowed are hidden unless this
+                        // transaction already is one (Lent/Borrowed are added
+                        // from the Loans page)
+                        if (![
+                              TransactionSpecialType.repetitive,
+                              TransactionSpecialType.credit,
+                              TransactionSpecialType.debt,
+                            ].contains(item) ||
+                            item == selectedType ||
+                            item == widget.selectedType ||
+                            item == widget.transaction?.type) ...[
+                        item,
+                        // Only when adding a new transaction, after Default
+                        if (item == null && widget.transaction == null)
+                          "spread",
+                      ],
+                    ],
                     getLabel: (item) {
+                      if (item == "spread") {
+                        return spreadMonths > 1
+                            ? "Chia " + spreadMonths.toString() + " tháng"
+                            : "Chia đều tháng";
+                      }
                       if (item is TransactionSpecialType || item == null) {
                         return transactionTypeDisplayToEnum[item]
                                 ?.toString()
@@ -1203,6 +1254,16 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                       }
                     },
                     onSelected: (item) async {
+                      if (item == "spread") {
+                        await openSpreadMonthsPicker();
+                        return;
+                      }
+                      // Any other type cancels spreading
+                      if (spreadMonths != 1) {
+                        setState(() {
+                          spreadMonths = 1;
+                        });
+                      }
                       if (item == "installments") {
                         openPopup(
                           context,
@@ -1227,80 +1288,14 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                       }
                     },
                     getSelected: (item) {
+                      if (item == "spread") return spreadMonths > 1;
+                      if (item == null && spreadMonths > 1) return false;
                       if (item is TransactionSpecialType || item == null) {
                         return selectedType == item;
                       } else {
                         return false;
                       }
                     },
-                  ),
-                ),
-              ),
-              AnimatedExpanded(
-                expand: selectedType == null && widget.transaction == null,
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.only(
-                      start: 22, end: 22, top: 8, bottom: 4),
-                  child: Tappable(
-                    color: spreadMonths > 1
-                        ? Theme.of(context).colorScheme.secondaryContainer
-                        : getColor(context, "lightDarkAccentHeavyLight"),
-                    borderRadius: 12,
-                    onTap: () {
-                      openBottomSheet(
-                        context,
-                        PopupFramework(
-                          title: "Chia đều cho bao nhiêu tháng?",
-                          subtitle:
-                              "Mỗi tháng ghi một phần bằng nhau. Số dư tài khoản vẫn trừ đủ ngay, còn chi tiêu từng tháng chỉ tính một phần.",
-                          child: SelectAmountValue(
-                            enableDecimal: false,
-                            // Start empty so typing "7" gives 7, not 17
-                            amountPassed: spreadMonths > 1
-                                ? spreadMonths.toString()
-                                : "",
-                            setSelectedAmount: (amount, _) {
-                              setState(() {
-                                spreadMonths =
-                                    (amount as num).toInt().clamp(1, 120);
-                              });
-                            },
-                            next: () async {
-                              popRoute(context);
-                            },
-                            nextLabel: "Xong",
-                          ),
-                        ),
-                      );
-                    },
-                    child: Padding(
-                      padding: const EdgeInsetsDirectional.symmetric(
-                          horizontal: 14, vertical: 12),
-                      child: Row(
-                        children: [
-                          Icon(
-                            appStateSettings["outlinedIcons"]
-                                ? Icons.calendar_view_month_outlined
-                                : Icons.calendar_view_month_rounded,
-                            size: 22,
-                          ),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: TextFont(
-                              text: "Chia đều theo tháng",
-                              fontSize: 16,
-                            ),
-                          ),
-                          TextFont(
-                            text: spreadMonths > 1
-                                ? spreadMonths.toString() + " tháng"
-                                : "Không",
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                 ),
               ),
