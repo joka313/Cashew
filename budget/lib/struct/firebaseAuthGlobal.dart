@@ -6,7 +6,13 @@ import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
 
 OAuthCredential? _credential;
 
+// Firebase is only used for shared budgets and the rating popup. On the web
+// its SDK download held the first frame for about 1.5s, so main() starts it
+// in the background there and Firebase users wait for it here.
+Future<void> firebaseInitialization = Future.value();
+
 Future<FirebaseFirestore?> firebaseGetDBInstanceAnonymous() async {
+  await firebaseInitialization;
   try {
     await FirebaseAuth.instance.signInAnonymously();
     return FirebaseFirestore.instance;
@@ -19,6 +25,7 @@ Future<FirebaseFirestore?> firebaseGetDBInstanceAnonymous() async {
 
 // returns null if authentication unsuccessful
 Future<FirebaseFirestore?> firebaseGetDBInstance() async {
+  await firebaseInitialization;
   if (_credential != null) {
     try {
       await FirebaseAuth.instance.signInWithCredential(_credential!);
