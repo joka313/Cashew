@@ -1,3 +1,4 @@
+import 'package:budget/struct/syncClient.dart';
 import 'dart:async';
 import 'package:budget/colors.dart';
 import 'package:budget/functions.dart';
@@ -451,26 +452,53 @@ class _SignInWithGoogleFlyInState extends State<SignInWithGoogleFlyIn> {
     recheckTimer = Timer.periodic(Duration(seconds: 10), (_) {
       if (mounted) setState(() {});
     });
+    cloudSyncPending.addListener(onCloudSyncPendingChanged);
     super.initState();
   }
 
   @override
   void dispose() {
     recheckTimer?.cancel();
+    cloudSyncPending.removeListener(onCloudSyncPendingChanged);
     super.dispose();
   }
 
+  // A new unsaved change shows the reminder again even if it was closed
+  void onCloudSyncPendingChanged() {
+    if (!mounted) return;
+    setState(() {
+      if (cloudSyncPending.value && entireAppLoaded) hide = false;
+    });
+  }
+
   // Last time the data reached Google Drive (sync or backup)
-  String lastSavedOnlineLabel() {
+  DateTime? lastSavedOnline() {
     List<DateTime> dates = [
       DateTime.tryParse(appStateSettings["lastCloudSync"] ?? ""),
       // lastBackup has a placeholder default before the first sign-in
       if (appStateSettings["hasSignedIn"] == true)
         DateTime.tryParse(appStateSettings["lastBackup"] ?? ""),
     ].whereType<DateTime>().toList();
-    if (dates.isEmpty) return "Chưa từng lưu online.";
+    if (dates.isEmpty) return null;
     dates.sort();
-    return "Lần lưu online gần nhất: " + getTimeAgo(dates.last) + ".";
+    return dates.last;
+  }
+
+  String lastSavedOnlineLabel() {
+    DateTime? last = lastSavedOnline();
+    if (last == null) return "Chưa từng lưu online.";
+    return "Lần lưu online gần nhất: " + getTimeAgo(last) + ".";
+  }
+
+  // Web: only remind when something is not on Google Drive yet, or when
+  // nothing was saved online for a few days, so opening the app just to
+  // scan a QR is not interrupted
+  bool get needsReminder {
+    if (!kIsWeb) return true;
+    if (cloudSyncPending.value) return true;
+    DateTime? last = lastSavedOnline();
+    return last == null ||
+        DateTime.now().difference(last) > Duration(days: 3);
   }
 
   void checkCloudFunctionsStatus() {
@@ -485,7 +513,12 @@ class _SignInWithGoogleFlyInState extends State<SignInWithGoogleFlyIn> {
     });
   }
 
-  bool get shouldExpand => !hide && googleUser == null;
+  bool get shouldExpand =>
+      !hide &&
+      googleUser == null &&
+      needsReminder &&
+      // Never over the scanner, add transaction or a popup
+      navigatorKey.currentState?.canPop() != true;
 
   @override
   Widget build(BuildContext context) {
@@ -610,7 +643,9 @@ class _SignInWithGoogleFlyInState extends State<SignInWithGoogleFlyIn> {
                                   start: 22, end: 22, bottom: 22),
                               child: TextFont(
                                 text:
-                                    "Dữ liệu đang chỉ nằm trên máy này. Bấm để đăng nhập Google, sau đó mọi thay đổi sẽ tự lưu lên Google Drive. " +
+                                    (cloudSyncPending.value
+                                          ? "Có thay đổi chưa được lưu lên Google Drive. Bấm để đăng nhập và lưu. "
+                                          : "Đã vài ngày chưa lưu online. Bấm để đăng nhập và lưu lên Google Drive. ") +
                                         lastSavedOnlineLabel(),
                                 maxLines: 10,
                                 fontSize: 15,

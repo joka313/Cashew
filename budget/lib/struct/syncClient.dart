@@ -71,6 +71,10 @@ Future<bool> setDateOfLastSyncedWithClient(
   return true;
 }
 
+// Web: data changed while signed out, so it is not on Google Drive yet.
+// The sync reminder shows when this is set.
+ValueNotifier<bool> cloudSyncPending = ValueNotifier(false);
+
 // if changeMadeSync show loading and check if syncEveryChange is turned on
 Timer? syncTimeoutTimer;
 Debouncer backupDebounce = Debouncer(milliseconds: 5000);
@@ -164,6 +168,7 @@ Future<bool> createSyncBackup(
   // Shown by the sync reminder as the last time data was saved online
   await updateSettings("lastCloudSync", DateTime.now().toString(),
       updateGlobalState: false);
+  cloudSyncPending.value = false;
   if (changeMadeSync)
     loadingIndeterminateKey.currentState?.setVisibility(false);
   return true;
