@@ -105,6 +105,7 @@ class AddTransactionPage extends StatefulWidget {
     this.selectedDate,
     this.selectedNotes,
     this.startInitialAddTransactionSequence = true,
+    this.skipTitlePrompt = false,
     this.transferBalancePopup = false,
     this.onTransactionAdded,
     required this.routesToPopAfterDelete,
@@ -126,6 +127,8 @@ class AddTransactionPage extends StatefulWidget {
   final DateTime? selectedDate;
   final String? selectedNotes;
   final bool startInitialAddTransactionSequence;
+  // Skip the date and title steps (e.g. a VietQR recipient paid before)
+  final bool skipTitlePrompt;
   final bool transferBalancePopup;
   // Called after the transaction was saved to the database
   final void Function(Transaction transaction)? onTransactionAdded;
@@ -819,6 +822,10 @@ class _AddTransactionPageState extends State<AddTransactionPage>
         }
         await premiumPopupAddTransaction(context);
         if (widget.startInitialAddTransactionSequence == false) return;
+        if (widget.skipTitlePrompt) {
+          afterSetTitle();
+          return;
+        }
         if (appStateSettings["askForTransactionTitle"]) {
           // Step 1: pick the date (keeps the time), step 2: enter the title
           DateTime initialDate = widget.selectedDate ?? selectedDate;

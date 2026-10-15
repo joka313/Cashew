@@ -5,6 +5,7 @@ import 'package:budget/database/tables.dart';
 import 'package:budget/functions.dart';
 import 'package:budget/pages/addTransactionPage.dart';
 import 'package:budget/vietqr/vietqr_image_reader.dart';
+import 'package:budget/vietqr/vietqr_memory.dart';
 import 'package:budget/vietqr/vietqr_parser.dart';
 import 'package:budget/vietqr/vietqr_paste_target.dart';
 import 'package:budget/vietqr/vietqr_transfer_sheet.dart';
@@ -26,7 +27,14 @@ Future openVietQrScanFlow(BuildContext context) async {
   VietQrData data = result;
 
   String title = data.note.isNotEmpty ? data.note : data.name;
+  // A recipient paid before: reuse its title, category and account and go
+  // straight to the amount
+  VietQrRememberedRecipient? remembered = await findRememberedRecipient(data);
+  if (remembered != null && remembered.title.trim().isNotEmpty) {
+    title = remembered.title;
+  }
   Transaction? savedTransaction;
+  if (!context.mounted) return;
   await pushRoute(
     context,
     AddTransactionPage(
@@ -34,10 +42,11 @@ Future openVietQrScanFlow(BuildContext context) async {
       selectedIncome: false,
       selectedAmount: data.amount,
       selectedTitle: title.isEmpty ? null : title,
-      selectedNotes: "QR: " +
-          (data.bankName.isNotEmpty ? data.bankName : data.bin) +
-          " " +
-          data.account,
+      selectedCategory: remembered?.category,
+      selectedSubCategory: remembered?.subCategory,
+      selectedWallet: remembered?.wallet,
+      skipTitlePrompt: remembered != null,
+      selectedNotes: vietQrNote(data),
       onTransactionAdded: (Transaction transaction) {
         savedTransaction = transaction;
       },
