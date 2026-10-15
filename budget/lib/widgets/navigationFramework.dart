@@ -67,6 +67,7 @@ import 'package:budget/widgets/transactionEntry/transactionEntry.dart';
 import 'package:budget/widgets/transactionEntry/transactionLabel.dart';
 import 'package:budget/widgets/util/checkWidgetLaunch.dart';
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
+import 'package:budget/vietqr/vietqr_scan_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -416,6 +417,13 @@ class PageNavigationFrameworkState extends State<PageNavigationFramework> {
       bool isDatabaseCorruptedPopupShown = openDatabaseCorruptedPopup(context);
       if (isDatabaseCorruptedPopupShown) return;
 
+      // Web link ".../Cashew/?scan" (e.g. from a Shortcut) opens the VietQR
+      // scanner straight away
+      // (before the slower startup steps below)
+      if (kIsWeb && Uri.base.queryParameters.containsKey("scan")) {
+        openVietQrScanFlow(context);
+      }
+
       await initializeNotificationsPlatform();
 
       bool isChangelogShown = showChangelog(context);
@@ -458,6 +466,8 @@ class PageNavigationFrameworkState extends State<PageNavigationFramework> {
 
       print("Entire app loaded");
 
+      // The watched tables emit once right away, ignore those
+      DateTime autoSyncListenStart = DateTime.now();
       database.watchAllForAutoSync().listen((event) {
         // Must be logged in to perform an automatic sync - googleUser != null
         // If we remove this, it will ask the user to login though - but it can be annoying
@@ -465,6 +475,12 @@ class PageNavigationFrameworkState extends State<PageNavigationFramework> {
         // so it shouldn't be an issue
         if (runningCloudFunctions == false && googleUser != null) {
           createSyncBackup(changeMadeSync: true);
+        } else if (kIsWeb &&
+            googleUser == null &&
+            DateTime.now().difference(autoSyncListenStart) >
+                Duration(seconds: 3)) {
+          // Not saved online yet, the sync reminder will ask for a sign in
+          cloudSyncPending.value = true;
         }
       });
 
